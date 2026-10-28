@@ -25,6 +25,9 @@ Edit `.env`:
 - `JWT_SECRET` — any long random string
 - `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` — API credentials from your
   Razorpay dashboard (use test credentials while testing)
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` —
+  backend-only Cloudinary credentials used for customer review photos. Never
+  add the Cloudinary secret to a `VITE_` variable or commit it to source control.
 
 Seed 10 starter products (safe to re-run, it replaces existing products):
 ```bash
@@ -103,10 +106,16 @@ Order delivery details can be edited, and edits are marked in the customer's
 order history. Deleting an order is separate from deleting a customer.
 
 Customers can sign in with their email address or phone number at `/account`
-to follow order status and submit a review after delivery. These order reviews
-are visible to admins in the Orders page and are not published as homepage
-testimonials automatically. Deleting a customer removes their profile and
-anonymizes personal details and review content on retained order records.
+to follow order status and review each product in a delivered order. Product
+reviews appear publicly on that product's detail page. A customer can edit or
+delete their own review; admins can delete any review from the admin Orders
+page. A review may include up to three JPEG, PNG, or WebP images, each no
+larger than 5 MB; images are uploaded to Cloudinary by the backend. Deleting a
+customer removes their profile and anonymizes their retained product reviews.
+
+Product detail pages show one in-stock recommendation, prioritizing shared
+product categories, then garment type and fabric. Unrelated or sold-out
+products are not included.
 
 Buy It Now opens checkout, where customers provide a delivery address and pay
 through Razorpay. The server calculates the amount from current product prices,
@@ -122,11 +131,26 @@ mobile number. The admin customer editor applies the same validation; older
 records with malformed phone or email values are marked for correction and
 must be fixed before saving.
 
-The admin panel has separate Products, Add Product, Sales, Orders, and
-Customers pages. Product stock is reviewed in a confirmation preview before
-saving. When size/color quantities are configured, those rows are the source of
+The admin panel includes an Overview page with this month's confirmed order
+value, active order follow-ups, low-stock alerts, and best sellers. From the
+overview, admins can open an order or jump directly to a product's stock editor.
+It also has separate Products, Add Product, Sales, Orders, and Customers pages.
+Admins can expand any order and print an invoice with its items, payment method
+and recorded payment status, delivery address, order status, tracking details,
+and total. Product stock is reviewed in a confirmation preview before saving.
+When size/color quantities are configured, those rows are the source of
 truth and automatically determine each color total and the product total.
 Without size rows, color stock totals determine the product total.
+
+On server startup, an obsolete unique `orderNumber` index left by an older
+database schema is removed from the orders collection. This prevents MongoDB
+from rejecting new orders that do not use that legacy field.
+
+When the admin dashboard is open, it checks for new orders every 30 seconds and
+shows an in-dashboard alert. Admins can optionally enable native browser
+notifications from the Orders section; no external notification provider is
+used. Alerts require the dashboard to remain open, and browser notifications
+require browser permission.
 
 The admin Sales History defaults to Today. Sales history and customer/order
 exports can be filtered by today, this week, this month, this year, last year,

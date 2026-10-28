@@ -234,19 +234,6 @@ router.get("/:id", requireCustomer, async (req, res) => {
   if (!order) return res.status(404).json({ message: "Order not found" });
   res.json(order);
 });
-router.post("/:id/review", requireCustomer, async (req, res) => {
-  const rating = Number(req.body.rating);
-  const text = String(req.body.text || "").trim();
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5 || !text || text.length > 1000) {
-    return res.status(400).json({ message: "Choose a 1–5 star rating and write a review under 1000 characters." });
-  }
-  const order = await Order.findOne({ _id: req.params.id, customer: req.user.sub });
-  if (!order) return res.status(404).json({ message: "Order not found" });
-  if (order.status !== "delivered") return res.status(400).json({ message: "You can review an order after it has been delivered." });
-  order.review = { rating, text, submittedAt: new Date() };
-  await order.save();
-  res.json({ review: order.review });
-});
 router.patch("/:id/tracking", requireAdmin, async (req, res) => {
   const order = await Order.findByIdAndUpdate(req.params.id, { trackingNumber: req.body.trackingNumber, carrier: req.body.carrier, status: "shipped" }, { new: true });
   if (!order) return res.status(404).json({ message: "Order not found" });

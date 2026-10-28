@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { api, setAdminToken } from "../api.js";
 import { CATEGORIES } from "../categories.js";
-import { Mail, MessageCircle } from "lucide-react";
+import { Bell, Mail, MessageCircle, Printer } from "lucide-react";
 import { downloadReportPdf, downloadReportPng } from "../utils/adminExports.js";
 import { useToast } from "../components/Toast.jsx";
+import "./AdminOrderPrint.css";
+import "./AdminOrderNotifications.css";
 
 const EMPTY = {
   title: "",
@@ -110,6 +113,23 @@ function normalizedOrderStatus(status) {
   })[status] || status || "order_placed";
 }
 
+function formatPaymentMethod(method) {
+  const labels = {
+    cod: "Cash on delivery",
+    phonepe: "PhonePe",
+    razorpay: "Razorpay",
+    "phonepe-manual": "PhonePe (manual)",
+    "razorpay-manual": "Razorpay (manual)",
+    instagram: "Instagram",
+    whatsapp: "WhatsApp",
+  };
+  if (labels[method]) return labels[method];
+
+  return String(method || "Not recorded")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function manualOrderStock(product, color, size) {
   if (!product) return 0;
 
@@ -157,9 +177,13 @@ function ReportDateFilter({ value, onChange, label }) {
 
 export default function AdminDashboard() {
   const showToast = useToast();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const knownOrderIds = useRef(null);
   const [products, setProducts] = useState([]);
   const [storefrontCategories, setStorefrontCategories] = useState(CATEGORIES);
   const [orders, setOrders] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [paymentFeedback, setPaymentFeedback] = useState([]);
 
@@ -194,9 +218,14 @@ export default function AdminDashboard() {
   const [productPreview, setProductPreview] = useState(null);
   const [savingProduct, setSavingProduct] = useState(false);
   const [savingManualOrder, setSavingManualOrder] = useState(false);
+  const [deletingOrderId, setDeletingOrderId] = useState("");
+  const [notificationPermission, setNotificationPermission] = useState(
+    () => typeof Notification === "undefined" ? "unsupported" : Notification.permission
+  );
 
   const [expandedOrder, setExpandedOrder] =
-    useState(null);
+    useState(() => new URLSearchParams(location.search).get("order"));
+  const [printOrder, setPrintOrder] = useState(null);
 
   const [colorRows, setColorRows] = useState([]);
   const [customColorName, setCustomColorName] = useState("");
@@ -274,17 +303,17 @@ export default function AdminDashboard() {
     : (manualProduct?.sizes?.length ? manualProduct.sizes : ["Free Size"]);
   const manualMaxStock = manualOrderStock(manualProduct, manualOrder.color, manualOrder.size);
 
-  const navigate = useNavigate();
-  const location = useLocation();
-  const adminPage = location.pathname.endsWith("/orders")
-    ? "orders"
-    : location.pathname.endsWith("/customers")
-      ? "customers"
-      : location.pathname.endsWith("/sales")
-        ? "sales"
-        : location.pathname.endsWith("/add-product")
-          ? "add-product"
-          : "products";
+  const adminPage = location.pathname.endsWith("/dashboard")
+    ? "overview"
+    : location.pathname.endsWith("/orders")
+      ? "orders"
+      : location.pathname.endsWith("/customers")
+        ? "customers"
+        : location.pathname.endsWith("/sales")
+          ? "sales"
+          : location.pathname.endsWith("/add-product")
+            ? "add-product"
+            : "products";
   const inventory = products.map((product) => {
     const stock = product.variantStock?.length
       ? product.variantStock.reduce((total, variant) => total + Math.max(0, Number(variant.stock) || 0), 0)
@@ -311,6 +340,47 @@ export default function AdminDashboard() {
     (total, order) => total + (confirmedStatuses.has(order.status) ? Number(order.total) || 0 : 0),
     0
   );
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const monthlyOrders = orders.filter((order) => {
+    const createdAt = new Date(order.createdAt);
+    return confirmedStatuses.has(order.status)
+      && !Number.isNaN(createdAt.getTime())
+      && createdAt >= monthStart
+      && createdAt < nextMonthStart;
+  });
+  const monthlyOrderValue = monthlyOrders.reduce((total, order) => total + (Number(order.total) || 0), 0);
+  const activeOrders = orders.filter((order) => !["delivered", "cancelled_refund"].includes(normalizedOrderStatus(order.status)));
+  const attentionOrders = activeOrders
+    .filter((order) => ["order_placed", "payment_confirmed", "processing_packed", "out_for_delivery"].includes(normalizedOrderStatus(order.status)))
+    .sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt))
+    .slice(0, 6);
+  const lowStockProducts = inventory
+    .filter((product) => product.inventoryStock <= 5)
+    .sort((left, right) => left.inventoryStock - right.inventoryStock)
+    .slice(0, 6);
+  const bestSellingProducts = (() => {
+    const totals = new Map();
+    for (const order of orders) {
+      if (!confirmedStatuses.has(order.status)) continue;
+      for (const item of order.items || []) {
+        const key = item.productId || item.title;
+        if (!key) continue;
+        const record = totals.get(key) || { title: item.title || "Product", quantity: 0 };
+        record.quantity += Math.max(0, Number(item.quantity) || 0);
+        totals.set(key, record);
+      }
+    }
+    return [...totals.values()].sort((left, right) => right.quantity - left.quantity).slice(0, 5);
+  })();
+  const statusLabels = {
+    order_placed: "Order placed",
+    payment_confirmed: "Payment confirmed",
+    processing_packed: "Processing / packed",
+    shipped: "Shipped",
+    out_for_delivery: "Out for delivery",
+  };
 
   function filteredReportRecords(type, records) {
     return filterRecordsByDate(records, reportFilters[type]);
@@ -373,18 +443,24 @@ export default function AdminDashboard() {
       api.get("/admin/orders"),
       api.get("/admin/customers"),
       api.get("/admin/payment-feedback"),
+      api.get("/reviews/admin"),
     ])
       .then(
         ([
           ordersResponse,
           customersResponse,
           paymentFeedbackResponse,
+          reviewsResponse,
         ]) => {
-          setOrders(ordersResponse.data);
+            if (!knownOrderIds.current) {
+              knownOrderIds.current = new Set(ordersResponse.data.map((order) => order._id));
+            }
+            setOrders(ordersResponse.data);
           setCustomers(
             customersResponse.data
           );
           setPaymentFeedback(paymentFeedbackResponse.data);
+          setReviews(reviewsResponse.data);
         }
       )
       .catch((err) => {
@@ -393,6 +469,18 @@ export default function AdminDashboard() {
             "Unable to load admin data"
         );
       });
+  }
+
+  async function deleteCustomerReview(review) {
+    if (!window.confirm("Delete this customer review and its uploaded images?")) return;
+    try {
+      const response = await api.delete(`/reviews/admin/${review._id}`);
+      setReviews((current) => current.filter((item) => item._id !== review._id));
+      setError("");
+      showToast(response.data.warning || "Customer review deleted.");
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to delete customer review.");
+    }
   }
 
 
@@ -430,10 +518,114 @@ export default function AdminDashboard() {
     // eslint-disable-next-line
   }, []);
 
+  useEffect(() => {
+    if (!localStorage.getItem("kcs_admin_token")) return undefined;
+
+    let active = true;
+    let requestInProgress = false;
+    let pollFailureReported = false;
+
+    async function checkForNewOrders() {
+      if (requestInProgress) return;
+      requestInProgress = true;
+
+      try {
+        const response = await api.get("/admin/orders");
+        if (!active) return;
+        if (!Array.isArray(response.data)) {
+          throw new Error("The new-order check returned an invalid response.");
+        }
+
+        const receivedOrders = response.data;
+        if (!knownOrderIds.current) {
+          knownOrderIds.current = new Set(receivedOrders.map((order) => order._id));
+          setOrders(receivedOrders);
+          pollFailureReported = false;
+          return;
+        }
+
+        const knownIds = knownOrderIds.current;
+        const newOrders = receivedOrders.filter((order) => !knownIds.has(order._id));
+        receivedOrders.forEach((order) => knownIds.add(order._id));
+        setOrders(receivedOrders);
+
+        if (newOrders.length) {
+          const title = newOrders.length === 1 ? "New order received" : `${newOrders.length} new orders received`;
+          const details = newOrders.slice(0, 3).map((order) =>
+            `#${order._id.slice(-8).toUpperCase()} — ${order.shippingAddress?.name || order.customer?.name || "Customer"}`
+          );
+          const body = [
+            ...details,
+            newOrders.length > details.length ? `and ${newOrders.length - details.length} more` : "",
+          ].filter(Boolean).join("\n");
+
+          showToast(`${title}: ${details.join("; ")}`);
+          if (notificationPermission === "granted") {
+            try {
+              new Notification(title, { body, tag: `new-orders-${newOrders[0]._id}` });
+            } catch (notificationError) {
+              console.error("Unable to show browser notification for new order:", notificationError);
+            }
+          }
+        }
+
+        pollFailureReported = false;
+      } catch (pollError) {
+        if (!active) return;
+        if (!pollFailureReported) {
+          console.error("Unable to check for new admin orders:", pollError);
+          showToast("Unable to check for new orders. Please check your connection.");
+          pollFailureReported = true;
+        }
+      } finally {
+        requestInProgress = false;
+      }
+    }
+
+    const intervalId = window.setInterval(checkForNewOrders, 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [notificationPermission, showToast]);
+
+  useEffect(() => {
+    if (!printOrder) return undefined;
+
+    const handleAfterPrint = () => setPrintOrder(null);
+    window.addEventListener("afterprint", handleAfterPrint);
+    const printFrame = window.requestAnimationFrame(() => window.print());
+
+    return () => {
+      window.cancelAnimationFrame(printFrame);
+      window.removeEventListener("afterprint", handleAfterPrint);
+    };
+  }, [printOrder]);
+
 
   // ============================================================
   // LOGOUT
   // ============================================================
+
+  async function enableBrowserNotifications() {
+    if (typeof Notification === "undefined") {
+      setNotificationPermission("unsupported");
+      return;
+    }
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      if (permission === "granted") {
+        showToast("Browser notifications enabled for new orders.");
+      } else {
+        showToast("Browser notifications were not enabled. In-dashboard alerts will still appear while this page is open.");
+      }
+    } catch (permissionError) {
+      console.error("Unable to request browser notification permission:", permissionError);
+      showToast("Unable to enable browser notifications in this browser.");
+    }
+  }
 
   function logout() {
     setAdminToken(null);
@@ -983,14 +1175,15 @@ function sendStructuredEmail(order) {
       !window.confirm(
         `Delete order #${order._id
           .slice(-8)
-          .toUpperCase()}? Stock will be restored.`
+          .toUpperCase()}? Stock will be restored for products and variants that are still available.`
       )
     ) {
       return;
     }
 
+    setDeletingOrderId(order._id);
     try {
-      await api.delete(
+      const response = await api.delete(
         `/admin/orders/${order._id}`
       );
 
@@ -1002,12 +1195,16 @@ function sendStructuredEmail(order) {
       );
 
       setExpandedOrder(null);
+      setError("");
+      showToast(response.data.warning || response.data.message || "Order deleted.");
 
     } catch (err) {
       setError(
         err.response?.data?.message ||
           "Unable to delete order"
       );
+    } finally {
+      setDeletingOrderId("");
     }
   }
 
@@ -1391,6 +1588,22 @@ function sendStructuredEmail(order) {
     }
   }
 
+  const printableItems = printOrder?.items || [];
+  const printableSubtotal = printableItems.reduce(
+    (total, item) => total + Number(item.price || 0) * Number(item.quantity || 0),
+    0
+  );
+  const printableTotal = Number(printOrder?.total || 0);
+  const printableAdjustment = printableTotal - printableSubtotal;
+  const printableAddress = printOrder?.shippingAddress || {};
+  const printableStatus = orderPhases.find(
+    ([status]) => status === normalizedOrderStatus(printOrder?.status)
+  )?.[1] || normalizedOrderStatus(printOrder?.status).replace(/_/g, " ");
+  const printablePaymentStatus = printOrder?.paymentId
+    ? "Paid — payment reference recorded"
+    : printOrder?.paymentMethod === "cod"
+      ? "Cash on delivery — collection status not recorded"
+      : "Not recorded";
 
   // ============================================================
   // UI
@@ -1407,6 +1620,7 @@ function sendStructuredEmail(order) {
         <h2>Admin Panel — {adminPage[0].toUpperCase() + adminPage.slice(1)}</h2>
 
         <div className="admin-head-actions">
+          <button className={`admin-section-tab${adminPage === "overview" ? " is-active" : ""}`} type="button" onClick={() => navigate("/admin/dashboard")}>Overview</button>
           <button className={`admin-section-tab${adminPage === "products" ? " is-active" : ""}`} type="button" onClick={() => navigate("/admin/products")}>Products</button>
           <button className={`admin-section-tab${adminPage === "add-product" ? " is-active" : ""}`} type="button" onClick={() => { resetForm(); navigate("/admin/add-product"); }}>Add Product</button>
           <button className={`admin-section-tab${adminPage === "sales" ? " is-active" : ""}`} type="button" onClick={() => navigate("/admin/sales")}>Sales</button>
@@ -1427,6 +1641,130 @@ function sendStructuredEmail(order) {
         </div>
       </div>
 
+      {adminPage === "overview" && (
+        <section className="admin-overview" aria-labelledby="admin-overview-title">
+          <div className="admin-overview-welcome">
+            <div>
+              <p className="eyebrow">Store operations</p>
+              <h1 id="admin-overview-title">Your store at a glance</h1>
+              <p>Key sales, fulfilment, and stock signals to help you prioritize today.</p>
+            </div>
+            <div className="admin-overview-quick-actions">
+              <button type="button" onClick={() => navigate("/admin/add-product")}>Add product</button>
+              <button type="button" onClick={() => navigate("/admin/orders")}>Manage orders</button>
+            </div>
+          </div>
+
+          <div className="admin-overview-metrics">
+            <article className="admin-overview-metric">
+              <span>Paid / active order value this month</span>
+              <strong>Rs. {monthlyOrderValue.toLocaleString("en-IN")}</strong>
+              <small>{monthlyOrders.length} confirmed order{monthlyOrders.length === 1 ? "" : "s"} this month</small>
+            </article>
+            <article className="admin-overview-metric">
+              <span>Orders in progress</span>
+              <strong>{activeOrders.length}</strong>
+              <small>Excludes delivered and cancelled orders</small>
+            </article>
+            <article className={`admin-overview-metric${lowStockProducts.length ? " is-warning" : ""}`}>
+              <span>Low-stock products</span>
+              <strong>{inventory.filter((product) => product.inventoryStock <= 5).length}</strong>
+              <small>Five or fewer units remaining, including sold out</small>
+            </article>
+            <article className="admin-overview-metric">
+              <span>Customers</span>
+              <strong>{customers.length}</strong>
+              <small>Registered customer accounts</small>
+            </article>
+          </div>
+
+          <div className="admin-overview-panels">
+            <section className="admin-overview-panel">
+              <div className="admin-overview-panel-head">
+                <div>
+                  <h2>Orders to follow up</h2>
+                  <p>Oldest active orders first</p>
+                </div>
+                <button type="button" onClick={() => navigate("/admin/orders")}>All orders</button>
+              </div>
+              {attentionOrders.length ? (
+                <div className="admin-overview-list">
+                  {attentionOrders.map((order) => {
+                    const status = normalizedOrderStatus(order.status);
+                    return (
+                      <article className="admin-overview-row" key={order._id}>
+                        <div>
+                          <strong>#{String(order._id).slice(-8).toUpperCase()}</strong>
+                          <span>{order.shippingAddress?.name || order.customer?.name || "Customer"}</span>
+                        </div>
+                        <div className="admin-overview-row-end">
+                          <span className={`admin-overview-status status-${status}`}>{statusLabels[status] || status}</span>
+                          <small>{order.createdAt ? new Date(order.createdAt).toLocaleDateString("en-IN") : "Date unavailable"}</small>
+                        </div>
+                        <button type="button" className="admin-overview-row-action" onClick={() => {
+                          navigate(`/admin/orders?order=${encodeURIComponent(order._id)}`);
+                        }}>Review order</button>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : <p className="admin-overview-empty">No orders currently need follow-up.</p>}
+            </section>
+
+            <section className="admin-overview-panel">
+              <div className="admin-overview-panel-head">
+                <div>
+                  <h2>Stock running low</h2>
+                  <p>Products with five or fewer units available</p>
+                </div>
+                <button type="button" onClick={() => navigate("/admin/products")}>Inventory</button>
+              </div>
+              {lowStockProducts.length ? (
+                <div className="admin-overview-list">
+                  {lowStockProducts.map((product) => (
+                    <article className="admin-overview-row" key={product._id}>
+                      <div>
+                        <strong>{product.title}</strong>
+                        <span>SKU: {product.sku}</span>
+                      </div>
+                      <span className={`admin-overview-stock${product.inventoryStock === 0 ? " is-out" : ""}`}>
+                        {product.inventoryStock === 0 ? "Out of stock" : `${product.inventoryStock} left`}
+                      </span>
+                      <button type="button" className="admin-overview-row-action" onClick={() => editProduct(product)}>Update stock</button>
+                    </article>
+                  ))}
+                </div>
+              ) : <p className="admin-overview-empty">No low-stock products right now.</p>}
+            </section>
+          </div>
+
+          <section className="admin-overview-panel admin-overview-best-sellers">
+            <div className="admin-overview-panel-head">
+              <div>
+                <h2>Best sellers</h2>
+                <p>Units on confirmed, active, or delivered orders</p>
+              </div>
+              <button type="button" onClick={() => navigate("/admin/sales")}>Sales report</button>
+            </div>
+            {bestSellingProducts.length ? (
+              <ol className="admin-best-seller-list">
+                {bestSellingProducts.map((product, index) => {
+                  const largestQuantity = bestSellingProducts[0].quantity || 1;
+                  return (
+                    <li key={`${product.title}-${index}`}>
+                      <span className="admin-best-seller-rank">{index + 1}</span>
+                      <div className="admin-best-seller-info">
+                        <div><strong>{product.title}</strong><span>{product.quantity} unit{product.quantity === 1 ? "" : "s"} ordered</span></div>
+                        <span className="admin-best-seller-track"><i style={{ width: `${Math.max(4, (product.quantity / largestQuantity) * 100)}%` }} /></span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : <p className="admin-overview-empty">Sales insights will appear after a paid order is recorded.</p>}
+          </section>
+        </section>
+      )}
 
       {/* ======================================================
           PRODUCT FORM
@@ -2719,11 +3057,34 @@ function sendStructuredEmail(order) {
 
       <section className="admin-section" id="admin-orders-list">
 
-        <h3>
-          Orders ({
-            orders.length
-          })
-        </h3>
+        <div className="admin-orders-heading">
+          <h3>Orders ({orders.length})</h3>
+          <div className="admin-order-notification-control">
+            {notificationPermission === "default" && (
+              <button type="button" onClick={enableBrowserNotifications}>
+                <Bell size={15} />
+                Enable browser notifications
+              </button>
+            )}
+            {notificationPermission === "granted" && (
+              <span className="admin-notification-enabled">
+                <Bell size={15} />
+                Browser notifications enabled
+              </span>
+            )}
+            {notificationPermission === "denied" && (
+              <span className="admin-notification-help">
+                Browser notifications are blocked; in-dashboard alerts remain active.
+              </span>
+            )}
+            {notificationPermission === "unsupported" && (
+              <span className="admin-notification-help">
+                Browser notifications unavailable; in-dashboard alerts remain active.
+              </span>
+            )}
+            <small>New orders are checked every 30 seconds while this dashboard is open.</small>
+          </div>
+        </div>
 
         <section className="payment-feedback-admin">
           <h4>Checkout feedback ({paymentFeedback.length})</h4>
@@ -3283,6 +3644,17 @@ function sendStructuredEmail(order) {
 
                                 <button
                                   type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setPrintOrder(order);
+                                  }}
+                                >
+                                  <Printer size={15} />
+                                  Print order
+                                </button>
+
+                                <button
+                                  type="button"
                                   onClick={(
                                     event
                                   ) => {
@@ -3329,6 +3701,7 @@ function sendStructuredEmail(order) {
                                 <button
                                   type="button"
                                   className="danger-button"
+                                  disabled={deletingOrderId === order._id}
                                   onClick={(
                                     event
                                   ) => {
@@ -3339,7 +3712,7 @@ function sendStructuredEmail(order) {
                                     );
                                   }}
                                 >
-                                  Delete order
+                                  {deletingOrderId === order._id ? "Deleting…" : "Delete order"}
                                 </button>
 
                               </div>
@@ -3385,6 +3758,93 @@ function sendStructuredEmail(order) {
       </section>
       </div>
 
+      {printOrder && createPortal(
+        <article className="order-print-sheet" aria-label="Printable order invoice">
+          <header className="order-print-header">
+            <div>
+              <p className="order-print-brand">Kashmir Cloth Stores</p>
+              <p>Order invoice</p>
+            </div>
+            <div className="order-print-number">
+              <strong>Order #{printOrder._id.slice(-8).toUpperCase()}</strong>
+              <span>
+                Placed{" "}
+                {printOrder.createdAt
+                  ? new Date(printOrder.createdAt).toLocaleString("en-IN")
+                  : "Date not recorded"}
+              </span>
+            </div>
+          </header>
+
+          <div className="order-print-info">
+            <section>
+              <h3>Delivery address</h3>
+              <strong>{printableAddress.name || printOrder.customer?.name || "Customer"}</strong>
+              <span>{printableAddress.address || "Address not recorded"}</span>
+              <span>
+                {[printableAddress.city, printableAddress.state, printableAddress.pinCode]
+                  .filter(Boolean)
+                  .join(", ") || "City / region not recorded"}
+              </span>
+              <span>Phone: {printableAddress.phone || printOrder.customer?.phone || "Not recorded"}</span>
+              {(printableAddress.email || printOrder.customer?.email) && (
+                <span>Email: {printableAddress.email || printOrder.customer?.email}</span>
+              )}
+            </section>
+
+            <section>
+              <h3>Order and payment</h3>
+              <span>Order status: {printableStatus}</span>
+              <span>Payment method: {formatPaymentMethod(printOrder.paymentMethod)}</span>
+              <span>Payment status: {printablePaymentStatus}</span>
+              {printOrder.paymentId && <span>Payment reference: {printOrder.paymentId}</span>}
+              {printOrder.trackingNumber && (
+                <span>
+                  Tracking: {[printOrder.carrier, printOrder.trackingNumber].filter(Boolean).join(" ")}
+                </span>
+              )}
+            </section>
+          </div>
+
+          <table className="order-print-items">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Options</th>
+                <th>Qty</th>
+                <th>Unit price</th>
+                <th>Line total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {printableItems.map((item, index) => (
+                <tr key={`${item.productId || item.title}-${index}`}>
+                  <td>{item.title || "Product"}</td>
+                  <td>{[item.size && `Size: ${item.size}`, item.color && `Color: ${item.color}`].filter(Boolean).join(" · ") || "—"}</td>
+                  <td>{Number(item.quantity || 0)}</td>
+                  <td>Rs. {Number(item.price || 0).toLocaleString("en-IN")}</td>
+                  <td>Rs. {(Number(item.price || 0) * Number(item.quantity || 0)).toLocaleString("en-IN")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="order-print-totals">
+            <div><span>Items subtotal</span><strong>Rs. {printableSubtotal.toLocaleString("en-IN")}</strong></div>
+            {Math.abs(printableAdjustment) > 0.01 && (
+              <div>
+                <span>Order adjustment</span>
+                <strong>
+                  {printableAdjustment < 0 ? "−" : "+"} Rs. {Math.abs(printableAdjustment).toLocaleString("en-IN")}
+                </strong>
+              </div>
+            )}
+            <div className="order-print-grand-total"><span>Order total</span><strong>Rs. {printableTotal.toLocaleString("en-IN")}</strong></div>
+          </div>
+          <p className="order-print-footer">Thank you for shopping with Kashmir Cloth Stores.</p>
+        </article>,
+        document.body
+      )}
 
       {/* ======================================================
           CUSTOMERS
@@ -3571,26 +4031,29 @@ function sendStructuredEmail(order) {
       </section>
 
       <section className="admin-section customer-order-reviews">
-        <h3>Customer Order Reviews</h3>
-        <p>Reviews submitted for delivered orders are visible here to admins only.</p>
-        {orders.filter((order) => order.review?.text).length ? (
+        <h3>Customer Product Reviews</h3>
+        <p>Verified reviews for delivered orders. Only admins can delete any customer review.</p>
+        {reviews.length ? (
           <div className="admin-table-scroll">
             <table className="admin-table">
-              <thead><tr><th>Order</th><th>Customer</th><th>Rating</th><th>Review</th><th>Submitted</th></tr></thead>
+              <thead><tr><th>Order</th><th>Product</th><th>Customer</th><th>Rating</th><th>Review</th><th>Photos</th><th>Submitted</th><th>Action</th></tr></thead>
               <tbody>
-                {orders.filter((order) => order.review?.text).map((order) => (
-                  <tr key={order._id}>
-                    <td>#{order._id.slice(-8).toUpperCase()}</td>
-                    <td>{order.shippingAddress?.name || order.customer?.name || "Deleted customer"}</td>
-                    <td>{"★".repeat(order.review.rating)}{"☆".repeat(5 - order.review.rating)}</td>
-                    <td>{order.review.text}</td>
-                    <td>{order.review.submittedAt ? new Date(order.review.submittedAt).toLocaleDateString("en-IN") : "—"}</td>
+                {reviews.map((review) => (
+                  <tr key={review._id}>
+                    <td>#{review.order?._id ? review.order._id.slice(-8).toUpperCase() : "—"}</td>
+                    <td>{review.product?.title || "Deleted product"}</td>
+                    <td>{review.authorName}</td>
+                    <td>{"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}</td>
+                    <td>{review.text}</td>
+                    <td><div className="admin-review-images">{(review.images || []).map((image) => <a key={image.publicId} href={image.url} target="_blank" rel="noreferrer"><img src={image.url} alt="Customer review" loading="lazy" /></a>)}</div></td>
+                    <td>{review.createdAt ? new Date(review.createdAt).toLocaleDateString("en-IN") : "—"}</td>
+                    <td><button type="button" className="danger-button" onClick={() => deleteCustomerReview(review)}>Delete review</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : <p>No customer order reviews submitted yet.</p>}
+        ) : <p>No customer product reviews submitted yet.</p>}
       </section>
       </div>
 

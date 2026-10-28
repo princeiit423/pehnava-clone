@@ -10,6 +10,7 @@ import crypto from "node:crypto";
 import { notifyOrder } from "../services/notifications.js";
 import Product from "../models/Product.js";
 import HomepageContent from "../models/HomepageContent.js";
+import Review from "../models/Review.js";
 import { buildOrderEmailHtml } from "../services/orderEmail.js";
 import { isValidCustomerEmail, isValidIndianPhone, normalizeCustomerEmail, normalizeIndianPhone } from "../utils/customerValidation.js";
 
@@ -24,12 +25,31 @@ const ORDER_STATUSES = [
   "cancelled_refund",
 ];
 
-async function restoreOrderStock(order) {
-  if (order.stockRestoredAt) return;
+async function restoreOrderStock(order, { skipUnavailable = false } = {}) {
+  if (order.stockRestoredAt) return [];
+  const unavailableItems = [];
   for (const item of order.items || []) {
     if (!item.productId || item.productId === "offline") continue;
+    if (!mongoose.isValidObjectId(item.productId)) {
+      if (skipUnavailable) {
+        unavailableItems.push(item.title || "A product with an invalid inventory reference");
+        continue;
+      }
+      throw new Error(`Unable to restore stock because product ${item.productId} has an invalid ID.`);
+    }
+    if (!Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0) {
+      if (skipUnavailable) {
+        unavailableItems.push(item.title || "A product with an invalid quantity");
+        continue;
+      }
+      throw new Error(`Unable to restore stock because ${item.title || "an order item"} has an invalid quantity.`);
+    }
     const product = await Product.findById(item.productId).select("variantStock colors");
     if (!product) {
+      if (skipUnavailable) {
+        unavailableItems.push(item.title || "An unavailable product");
+        continue;
+      }
       throw new Error(`Unable to restore stock because product ${item.productId} no longer exists.`);
     }
     const variant = product.variantStock?.find(
@@ -37,6 +57,10 @@ async function restoreOrderStock(order) {
         && String(entry.color || "").trim() === String(item.color || "").trim()
     );
     if (product.variantStock?.length && !variant) {
+      if (skipUnavailable) {
+        unavailableItems.push(item.title || "A product with an unavailable variant");
+        continue;
+      }
       throw new Error(`Unable to locate the ordered inventory variant for ${item.title}.`);
     }
     const color = product.colors?.find((entry) => entry.name === item.color);
@@ -64,11 +88,16 @@ async function restoreOrderStock(order) {
       options
     );
     if (!result.modifiedCount) {
+      if (skipUnavailable) {
+        unavailableItems.push(item.title || "A product with unavailable inventory");
+        continue;
+      }
       throw new Error(`Unable to restore stock for product ${item.productId}.`);
     }
   }
   order.stockRestoredAt = new Date();
   await order.save();
+  return unavailableItems;
 }
 
 async function rollbackManualOrderStock(adjustment) {
@@ -482,8 +511,12 @@ router.delete("/customers/:id", requireAdmin, async (req, res) => {
         $unset: { review: 1 },
       }
     );
+    await Review.updateMany(
+      { customer: customer._id },
+      { $set: { customer: null, authorName: "Deleted customer" } }
+    );
     await customer.deleteOne();
-    res.json({ message: "Customer profile and personal order details deleted; order records were retained anonymously." });
+    res.json({ message: "Customer profile and personal order details deleted; order records and reviews were retained anonymously." });
   } catch (error) {
     console.error("Delete customer error:", error);
     res.status(500).json({ message: "Failed to delete customer." });
@@ -665,13 +698,17 @@ router.delete(
         });
       }
 
-      await restoreOrderStock(order);
+      const unavailableItems = await restoreOrderStock(order, { skipUnavailable: true });
 
       await order.deleteOne();
 
       res.json({
-        message:
-          "Order deleted and stock restored",
+        message: "Order deleted",
+        ...(unavailableItems.length
+          ? {
+              warning: `Order deleted, but stock could not be restored for: ${unavailableItems.join(", ")}.`,
+            }
+          : { message: "Order deleted and stock restored" }),
       });
     } catch (error) {
       console.error(

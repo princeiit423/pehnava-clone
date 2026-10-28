@@ -9,7 +9,10 @@ import orderRoutes from "./routes/orders.js";
 import paymentRoutes from "./routes/payments.js";
 import homepageContentRoutes from "./routes/homepageContent.js";
 import storefrontSettingsRoutes from "./routes/storefrontSettings.js";
+import reviewRoutes from "./routes/reviews.js";
 import Customer from "./models/Customer.js";
+import Order from "./models/Order.js";
+import { removeLegacyOrderNumberIndex } from "./utils/orderIndexes.js";
 
 dotenv.config();
 
@@ -45,6 +48,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/homepage-content", homepageContentRoutes);
 app.use("/api", storefrontSettingsRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 app.get("/", (req, res) => res.send("Kashmir Cloth Stores API is running"));
 app.use((error, req, res, next) => {
@@ -58,8 +62,15 @@ const PORT = process.env.PORT || 5000;
 
 mongoose
   .connect(process.env.MONGODB_URI)
-  .then(() => {
+  .then(async () => {
     console.log("MongoDB Atlas connected");
+    const removedLegacyOrderIndex = await removeLegacyOrderNumberIndex(
+      mongoose.connection.db,
+      Order.collection.collectionName
+    );
+    if (removedLegacyOrderIndex) {
+      console.warn("Removed obsolete unique orderNumber index from orders collection");
+    }
     Customer.collection.dropIndex("email_1").catch(() => {});
     const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
     server.on("error", (error) => {
@@ -72,6 +83,6 @@ mongoose
     });
   })
   .catch((err) => {
-    console.error("MongoDB connection error:", err.message);
+    console.error("MongoDB startup error:", err.message);
     process.exit(1);
   });

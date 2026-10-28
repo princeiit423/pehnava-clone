@@ -9,7 +9,9 @@ import HomeFeatures from "../components/HomeFeatures.jsx";
 import LoadingImage from "../components/LoadingImage.jsx";
 import { LoadingState } from "../components/LoadingState.jsx";
 import { startCheckout } from "../utils/checkout.js";
+import { getRelatedProduct } from "../utils/productRecommendations.js";
 import { Heart, Share2, Minus, Plus, ChevronRight } from "lucide-react";
+import "./ProductRecommendations.css";
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -18,7 +20,10 @@ export default function ProductDetail() {
   const [product, setProduct] = useState(null);
   const [activeImg, setActiveImg] = useState(0);
   const [tab, setTab] = useState("description");
-  const [recentProducts, setRecentProducts] = useState([]);
+  const [productReviews, setProductReviews] = useState([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+  const [reviewLoadError, setReviewLoadError] = useState("");
+  const [relatedProduct, setRelatedProduct] = useState(null);
   const [homepageContent, setHomepageContent] = useState({
     influencerPicks: [],
     instagramPosts: [],
@@ -29,7 +34,7 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [loadError, setLoadError] = useState("");
   const { isLiked, toggleLike } = useLikes();
-  const { recent, addRecent } = useRecentlyViewed();
+  const { addRecent } = useRecentlyViewed();
   const showToast = useToast();
 
   function firstAvailableSize(productData, colorName) {
@@ -57,10 +62,46 @@ export default function ProductDetail() {
   }, [slug, searchParams]);
 
   useEffect(() => {
-    const ids = recent.filter((id) => id !== product?._id);
-    if (ids.length === 0) return setRecentProducts([]);
-    api.get(`/products?ids=${ids.join(",")}`).then((res) => setRecentProducts(res.data));
-  }, [recent, product]);
+    let cancelled = false;
+    setLoadingReviews(true);
+    setReviewLoadError("");
+    api.get(`/reviews/products/${encodeURIComponent(slug)}`)
+      .then((response) => {
+        if (!cancelled) setProductReviews(response.data);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setProductReviews([]);
+        setReviewLoadError(error.response?.data?.message || "Customer reviews could not be loaded.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingReviews(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setRelatedProduct(null);
+    if (!product) return undefined;
+
+    api.get("/products")
+      .then((response) => {
+        if (cancelled) return;
+        const products = Array.isArray(response.data) ? response.data : [];
+        setRelatedProduct(getRelatedProduct(products, product));
+      })
+      .catch((error) => {
+        console.error("Failed to load related products:", error);
+        if (!cancelled) setRelatedProduct(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [product]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +156,9 @@ export default function ProductDetail() {
   const selectedColorImages = product.colors?.find((color) => color.name === selectedColor)?.images?.filter(Boolean) || [];
   const galleryImages = selectedColorImages.length ? selectedColorImages : product.images || [];
   const activeImage = galleryImages[activeImg] || product.images?.[0];
+  const averageReviewRating = productReviews.length
+    ? productReviews.reduce((total, review) => total + review.rating, 0) / productReviews.length
+    : 0;
 
   function handleBuyNow() {
     startCheckout(navigate, {
@@ -177,6 +221,13 @@ export default function ProductDetail() {
         <div className="pd-info">
           <h1>{product.title}</h1>
           <p className="pd-price">Rs. {(product.salePrice ?? product.price).toLocaleString("en-IN")}.00 {product.discount > 0 && <del>Rs. {product.price.toLocaleString("en-IN")}</del>} {product.discount > 0 && <strong className="discount-badge">{product.discount}% OFF</strong>}</p>
+          {!loadingReviews && !reviewLoadError && productReviews.length > 0 && (
+            <a className="pd-review-link" href="#product-reviews">
+              <span aria-hidden="true">{"★".repeat(Math.round(averageReviewRating))}</span>
+              <strong>{averageReviewRating.toFixed(1)}</strong>
+              <span>{productReviews.length} customer review{productReviews.length === 1 ? "" : "s"}</span>
+            </a>
+          )}
           <p className="pd-sku">SKU: {product.sku}</p>
 
           {product.colors?.length > 0 && (
@@ -250,16 +301,67 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {recentProducts.length > 0 && (
-        <section className="products-section">
-          <h2>Recently Viewed Products</h2>
-          <div className="product-row">
-            {recentProducts.map((p) => (
-              <ProductCard key={p._id} product={p} />
+      <section id="product-reviews" className="product-reviews" aria-labelledby="product-reviews-heading">
+        <div className="product-reviews-heading">
+          <div>
+            <p className="eyebrow">From our customers</p>
+            <h2 id="product-reviews-heading">Customer reviews</h2>
+          </div>
+          {!loadingReviews && !reviewLoadError && productReviews.length > 0 && (
+            <p className="product-review-summary">
+              <strong>★ {averageReviewRating.toFixed(1)}</strong>
+              <span>{productReviews.length} review{productReviews.length === 1 ? "" : "s"}</span>
+            </p>
+          )}
+        </div>
+        {loadingReviews ? <p>Loading reviews…</p> : reviewLoadError ? (
+          <p className="error" role="alert">{reviewLoadError}</p>
+        ) : productReviews.length ? (
+          <div className="product-review-list">
+            {productReviews.map((review) => (
+              <article className="product-review-card" key={review._id}>
+                <div className="product-review-meta">
+                  <strong>{review.authorName}</strong>
+                  <span className="product-review-stars" aria-label={`${review.rating} out of 5 stars`}>
+                    {"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}
+                  </span>
+                  <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString("en-IN")}</time>
+                </div>
+                <p>{review.text}</p>
+                {review.images?.length > 0 && (
+                  <div className="review-image-list">
+                    {review.images.map((image) => (
+                      <a key={image.publicId} href={image.url} target="_blank" rel="noreferrer">
+                        <img src={image.url} alt={`Photo shared by ${review.authorName}`} loading="lazy" />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </article>
             ))}
+          </div>
+        ) : <p>No customer reviews yet. Be the first to share your experience after delivery.</p>}
+      </section>
+
+      {relatedProduct && (
+        <section className="products-section product-recommendation-section">
+          <p className="eyebrow">Picked for you</p>
+          <h2>You may also like</h2>
+          <div className="product-row product-recommendation-row">
+            <ProductCard product={relatedProduct} showBuyNow={false} />
           </div>
         </section>
       )}
+      <div className="mobile-product-buy-bar">
+        <div className="mobile-product-buy-price">
+          <span>{isUnavailable ? "Currently unavailable" : "Price"}</span>
+          <strong>Rs. {Number(product.salePrice ?? product.price).toLocaleString("en-IN")}.00</strong>
+        </div>
+        <button type="button" className="mobile-product-buy-button" onClick={handleBuyNow} disabled={isUnavailable || quantity > availableStock}>
+          {isUnavailable ? "Sold out" : "Buy now"}
+          {!isUnavailable && <ChevronRight size={20} aria-hidden="true" />}
+        </button>
+      </div>
       <HomeFeatures products={[]} content={homepageContent} showColors={false} />
     </main>
   );

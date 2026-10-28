@@ -1,4 +1,5 @@
 import express from "express";
+import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import { requireAdmin } from "../middleware/auth.js";
 
@@ -131,7 +132,10 @@ router.get("/", async (req, res) => {
 // GET /api/products/:slug
 router.get("/:slug", async (req, res) => {
   try {
-    const product = await Product.findOne({ slug: req.params.slug });
+    let product = await Product.findOne({ slug: req.params.slug });
+    if (!product && mongoose.isValidObjectId(req.params.slug)) {
+      product = await Product.findById(req.params.slug);
+    }
     if (!product) return res.status(404).json({ message: "Not found" });
     res.json(toProductResponse(product));
   } catch (err) {
