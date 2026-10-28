@@ -1,0 +1,26 @@
+{
+  "planHash": "98ea45e3feac981e17d721644e07092b89f2e8ac7a4acee25025bff0ed5457d9",
+  "phase": "postupgrade",
+  "recordedAtUtc": "2026-09-03T12:08:41.2807121Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 7425,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "production-build",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E pehnava-clone-client@1.0.0 build\r\n\u003E vite build\r\n\r\n\u001B[36mvite v5.4.21 \u001B[32mbuilding for production...\u001B[36m\u001B[39m\r\ntransforming...\r\n\u001B[32m\u2713\u001B[39m 1913 modules transformed.\r\nrendering chunks...\r\ncomputing gzip size...\r\n\u001B[2mdist/\u001B[22m\u001B[32mindex.html                 \u001B[39m\u001B[1m\u001B[2m  0.67 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:  0.39 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[35massets/index-CuMEurp8.css  \u001B[39m\u001B[1m\u001B[2m 44.87 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip:  8.44 kB\u001B[22m\r\n\u001B[2mdist/\u001B[22m\u001B[36massets/index-LmmGy4TW.js   \u001B[39m\u001B[1m\u001B[2m263.17 kB\u001B[22m\u001B[1m\u001B[22m\u001B[2m \u2502 gzip: 85.93 kB\u001B[22m\r\n\u001B[32m\u2713 built in 8.40s\u001B[39m\r\n",
+        "durationMs": 11314
+      }
+    ]
+  }
+}

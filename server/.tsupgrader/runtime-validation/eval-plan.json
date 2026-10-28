@@ -1,0 +1,20 @@
+{
+  "generatedAt": "2026-09-03T16:50:00Z",
+  "generatedOnPlatform": "win32",
+  "projectType": "server",
+  "setup": [
+    { "command": "npm", "args": ["install"], "timeoutSeconds": 600 }
+  ],
+  "assertions": [
+    {
+      "name": "api-root-200",
+      "kind": "http-probe",
+      "startCommand": "npm",
+      "startArgs": ["start"],
+      "url": "http://localhost:5000/",
+      "verificationMethod": "http-status",
+      "expected": "200",
+      "timeoutSeconds": 120
+    }
+  ]
+}

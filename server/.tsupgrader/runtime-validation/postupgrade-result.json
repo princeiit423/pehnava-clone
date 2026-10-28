@@ -1,0 +1,26 @@
+{
+  "planHash": "8c6cf914ecf6eac0e8a7906c382cd22853116c27cda4febeb24492b3db1fee8f",
+  "phase": "postupgrade",
+  "recordedAtUtc": "2026-09-03T12:08:29.5102971Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 6695,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "api-root-200",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\nPehnava clone API is running",
+        "durationMs": 181
+      }
+    ]
+  }
+}
