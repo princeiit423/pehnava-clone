@@ -55,6 +55,7 @@ const linkSchema = new mongoose.Schema(
 const storefrontSettingsSchema = new mongoose.Schema(
   {
     key: { type: String, unique: true, default: "storefront" },
+    impressionTrackingEnabled: { type: Boolean, default: false },
     categories: { type: [categorySchema], default: [] },
     homeCarousels: { type: [homeCarouselSchema], default: [] },
     announcements: { type: [String], default: [] },

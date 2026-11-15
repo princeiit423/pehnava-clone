@@ -2,13 +2,15 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { CATEGORIES } from "../categories.js";
 import { useLikes } from "../context/LikesContext.jsx";
-import { Search } from "lucide-react";
+import { Heart, Moon, Search, ShoppingBag, Sun } from "lucide-react";
 import { api } from "../api.js";
+import { useCart } from "../context/CartContext.jsx";
+import { useTheme } from "../context/ThemeContext.jsx";
 
 const defaultAnnouncements = [
   "Free shipping on all orders across India",
-  "Need help with an order? WhatsApp us at 7004281547",
-  "Urgent delivery within 24 hours in Dhanbad, Asansol, Bokaro & nearby cities — order via Instagram",
+  "Questions about an order? Email racoonbro777@gmail.com",
+  "RacoonBro — everyday essentials, on repeat.",
 ];
 
 export default function Header() {
@@ -17,7 +19,11 @@ export default function Header() {
   const [announcementIndex, setAnnouncementIndex] = useState(0);
   const [storefront, setStorefront] = useState(null);
   const { likes } = useLikes();
+  const { itemCount } = useCart();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const ThemeIcon = theme === "dark" ? Sun : Moon;
+  const themeAction = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
 
   function closeMenu() {
     setMenuOpen(false);
@@ -67,7 +73,7 @@ export default function Header() {
   const categories = storefront
     ? (storefront.categories || []).filter((category) => category.active !== false)
     : CATEGORIES;
-  const desktopOrder = ["trending", "stitched-wear", "Unstitched", "festive-wear", "luxe", "save-more"];
+  const desktopOrder = ["trending", "stitched-wear", "daily-wear", "party-wear", "festive-wear", "luxe", "save-more"];
   const mainLinks = categories
     .filter((category) => category.type !== "price")
     .sort((a, b) => {
@@ -114,9 +120,8 @@ export default function Header() {
           {menuOpen ? "×" : "☰"}
         </button>
 
-        <Link to="/" className="logo" onClick={closeMenu}>
-          KASHMIR
-          <small>CLOTH STORES</small>
+        <Link to="/" className="logo nav-brand" aria-label="RacoonBro home" onClick={closeMenu}>
+          <img className="nav-brand-logo" src="/Logos/RacoonBro_primary_logo.png" alt="RacoonBro — Wear the Attitude" />
         </Link>
 
         <nav>
@@ -152,11 +157,18 @@ export default function Header() {
             </button>
           </form>
 
-          <Link to="/likes" className="wishlist-btn" title="My Likes">
-            ♥
+          <Link to="/likes" className="wishlist-btn" title="My Wishlist" aria-label={`My Wishlist${likes.length ? `, ${likes.length} saved products` : ""}`}>
+            <Heart className="wishlist-icon" size={20} strokeWidth={2} fill="currentColor" aria-hidden="true" />
             {likes.length > 0 && <sup>{likes.length}</sup>}
           </Link>
-          <Link to="/account" className="account-link">Account</Link>
+          <Link to="/cart" className="cart-header-link" aria-label={`Shopping cart, ${itemCount} ${itemCount === 1 ? "item" : "items"}`} title="Shopping cart">
+            <ShoppingBag size={19} strokeWidth={1.8} />
+            {itemCount > 0 && <sup>{itemCount > 99 ? "99+" : itemCount}</sup>}
+          </Link>
+          <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={themeAction} aria-pressed={theme === "dark"} title={themeAction}>
+            <ThemeIcon size={18} aria-hidden="true" />
+          </button>
+          <Link to="/account" className="account-link">My Dashboard</Link>
         </div>
       </div>
 
@@ -197,8 +209,15 @@ export default function Header() {
           </Link>
         ))}
         <Link to="/account" onClick={closeMenu}>
-          My account
+          My Dashboard
         </Link>
+        <Link to="/cart" onClick={closeMenu}>
+          Shopping cart {itemCount > 0 ? `(${itemCount})` : ""}
+        </Link>
+        <button className="theme-toggle mobile-theme-toggle" type="button" onClick={toggleTheme} aria-label={themeAction} aria-pressed={theme === "dark"}>
+          <ThemeIcon size={18} aria-hidden="true" />
+          <span className="theme-toggle-label">{themeAction}</span>
+        </button>
       </aside>
     </header>
   );

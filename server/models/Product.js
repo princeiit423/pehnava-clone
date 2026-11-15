@@ -17,15 +17,19 @@ const productSchema = new mongoose.Schema(
     sku: { type: String, required: true },
     price: { type: Number, required: true },
     discount: { type: Number, min: 0, max: 99, default: 0 },
+    impressionCount: { type: Number, min: 0, default: 0 },
     stock: { type: Number, min: 0, default: 1 },
     images: { type: [String], default: [] },
-    type: { type: String, default: "Stitched/Ready to Wear" },
+    type: { type: String, default: "T-Shirt" },
     fabric: { type: String, default: "Cotton" },
-    dupatta: { type: String, default: "Cotton" },
+    fit: { type: String, default: "" },
+    occasion: { type: String, default: "" },
+    dupatta: { type: String, default: "" },
     colors: { type: [colorSchema], default: [] },
-    sizes: { type: [String], default: ["Free Size"] },
+    sizes: { type: [String], default: ["S", "M", "L", "XL"] },
     variantStock: { type: [variantStockSchema], default: [] },
     categories: { type: [String], default: [] },
+    codEligible: { type: Boolean, default: true },
     soldOut: { type: Boolean, default: false },
     isNew: { type: Boolean, default: true },
     description: { type: String, default: "" },
@@ -39,5 +43,6 @@ const productSchema = new mongoose.Schema(
 );
 
 productSchema.index({ title: "text", sku: "text" });
+productSchema.index({ createdAt: -1, _id: -1 });
 
 export default mongoose.model("Product", productSchema);

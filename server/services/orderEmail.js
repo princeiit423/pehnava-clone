@@ -1,6 +1,3 @@
-const COMPANY_LOGO_URL =
-  "https://res.cloudinary.com/dvnwxbqqh/image/upload/v1788449875/IMG_20260903_210034_ru7fpz.png";
-
 function getPublicAppBaseUrl() {
   const configuredOrigins = (process.env.CLIENT_ORIGIN || "").split(",");
 
@@ -76,6 +73,8 @@ export function buildOrderEmailHtml(order) {
 
     return sum + price * quantity;
   }, 0);
+  const codFee = Math.max(0, Number(order.codFee) || 0);
+  const couponDiscount = Math.max(0, Number(order.couponDiscount) || 0);
 
   // Use actual values if your Order model has them
   const shipping =
@@ -96,7 +95,7 @@ export function buildOrderEmailHtml(order) {
   const savedTotal = Number(order.total);
 
   const calculatedTotal =
-    subtotal + shipping + taxes;
+    subtotal - couponDiscount + shipping + taxes + codFee;
 
   const finalTotal =
     Number.isFinite(savedTotal)
@@ -365,7 +364,7 @@ export function buildOrderEmailHtml(order) {
   </style>
 
   <title>
-    Kashmir Cloth Stores - Order #${escapeHtml(orderId)}
+    RacoonBro - Order #${escapeHtml(orderId)}
   </title>
 </head>
 
@@ -420,22 +419,9 @@ export function buildOrderEmailHtml(order) {
               align="center"
               style="
                 padding:34px 30px 20px;
+                background:#17191c;
               "
             >
-
-              <img
-                src="${COMPANY_LOGO_URL}"
-                width="140"
-                alt="Kashmir Cloth Stores"
-                style="
-                  display:block;
-                  width:140px;
-                  max-width:100%;
-                  height:auto;
-                  margin:0 auto 13px;
-                  border:0;
-                "
-              >
 
               <h1
                 style="
@@ -444,10 +430,10 @@ export function buildOrderEmailHtml(order) {
                   line-height:1.3;
                   font-weight:700;
                   letter-spacing:.2px;
-                  color:#111111;
+                  color:#b7f35c;
                 "
               >
-                Kashmir Cloth Stores
+                RacoonBro
               </h1>
 
               <p
@@ -456,7 +442,7 @@ export function buildOrderEmailHtml(order) {
                   font-size:12px;
                   line-height:1.4;
                   letter-spacing:1.8px;
-                  color:#999999;
+                  color:#c6ccc7;
                 "
               >
                 ORDER #${escapeHtml(orderId)}
@@ -674,6 +660,20 @@ export function buildOrderEmailHtml(order) {
                   </td>
 
                 </tr>
+
+                ${couponDiscount > 0 ? `
+                <tr>
+                  <td>Coupon (${escapeHtml(order.couponCode || "")})</td>
+                  <td align="right">− ${formatRs(couponDiscount)}</td>
+                </tr>
+                ` : ""}
+
+                ${codFee > 0 ? `
+                <tr>
+                  <td>COD cash-handling fee</td>
+                  <td align="right">${formatRs(codFee)}</td>
+                </tr>
+                ` : ""}
 
                 <tr>
 
@@ -908,18 +908,7 @@ export function buildOrderEmailHtml(order) {
                   color:#222222;
                 "
               >
-                Kashmir Cloth Stores
-              </p>
-
-              <p
-                style="
-                  margin:7px 0 0;
-                  font-size:12px;
-                  line-height:1.5;
-                  color:#888888;
-                "
-              >
-                Main Road, Phusro • Jharkhand
+                RacoonBro
               </p>
 
               <p
@@ -930,18 +919,17 @@ export function buildOrderEmailHtml(order) {
                   color:#888888;
                 "
               >
-                Questions? Reply to this email
-                or contact us at
+                Questions? Reply to this email or contact us at
 
                 <a
-                  href="mailto:amaanhussain786pr@gmail.com"
+                  href="mailto:racoonbro777@gmail.com"
                   style="
                     color:#222222;
                     text-decoration:none;
                     font-weight:600;
                   "
                 >
-                  amaanhussain786pr@gmail.com
+                  racoonbro777@gmail.com
                 </a>
 
               </p>

@@ -5,6 +5,142 @@ import { DEFAULT_STOREFRONT_SETTINGS } from "../utils/storefrontDefaults.js";
 
 const router = express.Router();
 
+const LEGACY_INSTAGRAM_URL = "https://www.instagram.com/kashmirclothstores/";
+const LEGACY_CATEGORY_LABELS = {
+  trending: "New DROP",
+  "stitched-wear": "Ready To Wear",
+  "daily-wear": "Daily Wear",
+  "party-wear": "Party Wear",
+  "festive-wear": "Festive Wear",
+  readymade: "Readymade",
+  "celebrity-look": "Celebrity Look",
+  luxe: "LUXE",
+  unstitched: "Unstitched",
+  "save-more": "Sale Deals",
+  "suits-under-1699": "Suits Under ₹1,699",
+  "suits-1700-3000": "₹1,700 - ₹3,000",
+  "premium-suits-above-3-000": "Premium Suits ₹3,000+",
+};
+const LEGACY_CAROUSEL_TITLES = [
+  "New Drop",
+  "Ready To Wear",
+  "Unstitched",
+  "Suits Under ₹1,699",
+  "₹1,700 - ₹3,000",
+  "Premium 3000+",
+];
+
+function replaceLegacyBrand(value) {
+  return String(value || "")
+    .replace(/GhostFreak/gi, "RacoonBro")
+    .replace(/ghostfreak777@gmail\.com/gi, "racoonbro777@gmail.com");
+}
+
+function isUnconfirmedBusinessPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
+  return ["7004281547", "8292864636", "9876543210"].includes(digits);
+}
+
+function updateLegacyDefaultContent(saved) {
+  if (!saved) return saved;
+  const updated = { ...saved };
+
+  if (Array.isArray(saved.categories) && saved.categories.length === Object.keys(LEGACY_CATEGORY_LABELS).length
+    && saved.categories.every((category) => LEGACY_CATEGORY_LABELS[String(category.slug).toLowerCase()] === category.label)) {
+    updated.categories = DEFAULT_STOREFRONT_SETTINGS.categories.map((category) => {
+      const previous = saved.categories.find((entry) => String(entry.slug).toLowerCase() === category.slug.toLowerCase());
+      return previous ? {
+        ...category,
+        active: previous.active,
+        showOnHomepage: previous.showOnHomepage,
+        homepageOrder: previous.homepageOrder,
+        imageUrl: previous.imageUrl || "",
+      } : category;
+    });
+  }
+  if (Array.isArray(updated.categories)) {
+    updated.categories = updated.categories.map((category) => ({
+      ...category,
+      label: replaceLegacyBrand(category.label),
+    }));
+  }
+  if (Array.isArray(updated.homeCarousels)) {
+    updated.homeCarousels = updated.homeCarousels.map((section) => ({
+      ...section,
+      title: replaceLegacyBrand(section.title),
+    }));
+  }
+  for (const group of ["shopColors", "showroom"]) {
+    if (updated[group]) {
+      updated[group] = Object.fromEntries(
+        Object.entries(updated[group]).map(([field, value]) => [field, replaceLegacyBrand(value)])
+      );
+    }
+  }
+
+  if (Array.isArray(saved.homeCarousels) && saved.homeCarousels.length === LEGACY_CAROUSEL_TITLES.length
+    && saved.homeCarousels.every((section, index) => section.title === LEGACY_CAROUSEL_TITLES[index]
+      && section.active !== false && Number(section.order || 0) === index)) {
+    updated.homeCarousels = DEFAULT_STOREFRONT_SETTINGS.homeCarousels;
+  }
+
+  if (Array.isArray(saved.announcements)) {
+    updated.announcements = saved.announcements.map((message) => {
+      if (message === "Need help with an order? WhatsApp us at 7004281547") {
+        return "Questions about an order? Email racoonbro777@gmail.com";
+      }
+      if (message === "Urgent delivery within 24 hours in Dhanbad, Asansol, Bokaro & nearby cities — order via Instagram") {
+        return "RacoonBro — everyday essentials, on repeat.";
+      }
+      return replaceLegacyBrand(message);
+    });
+  }
+
+  if (Array.isArray(saved.locations)) {
+    updated.locations = saved.locations
+      .filter((location) => !(location.name === "Kashmir Cloth Stores" && location.phone === "8292864636"))
+      .map((location) => ({
+        ...location,
+        phone: isUnconfirmedBusinessPhone(location.phone) ? "" : location.phone,
+      }));
+  }
+
+  const contact = { ...(saved.contact || {}) };
+  if (isUnconfirmedBusinessPhone(contact.whatsapp)) contact.whatsapp = "";
+  if (["kashmir.clothstores04@gmail.com", "ghostfreak777@gmail.com"].includes(String(contact.email || "").toLowerCase())) {
+    contact.email = DEFAULT_STOREFRONT_SETTINGS.contact.email;
+  }
+  for (const field of ["heading", "intro", "helpHeading", "helpText"]) {
+    if (contact[field]) contact[field] = replaceLegacyBrand(contact[field]);
+  }
+  if (contact.instagram === LEGACY_INSTAGRAM_URL) contact.instagram = "";
+  updated.contact = contact;
+
+  if (Array.isArray(saved.story) && saved.story.length === 5
+    && saved.story[0]?.startsWith("Started Business in 1960s")
+    && saved.story[4] === "Founder: Late Janab Akhtar Hussain") {
+    updated.story = DEFAULT_STOREFRONT_SETTINGS.story;
+  } else if (Array.isArray(saved.story)) {
+    updated.story = saved.story.map(replaceLegacyBrand);
+  }
+
+  const footer = { ...(saved.footer || {}) };
+  if (footer.description === "Beautiful Sarees, Lehenga, stitched & unstitched Suits for Women. Shirting & Suiting, Coat-Pant, Kurta and Sherwani Fabrics for Men.") {
+    footer.description = DEFAULT_STOREFRONT_SETTINGS.footer.description;
+  }
+  if (footer.address === "Main Road Phusro Bazar, Bokaro, Jharkhand, India") footer.address = "";
+  if (footer.instagramUrl === LEGACY_INSTAGRAM_URL) footer.instagramUrl = "";
+  if (footer.description) footer.description = replaceLegacyBrand(footer.description);
+  if (footer.links) {
+    footer.links = footer.links.map((link) => ({ ...link, label: replaceLegacyBrand(link.label) }));
+  }
+  if (Array.isArray(footer.links)) footer.links = footer.links.filter((link) => link.url !== LEGACY_INSTAGRAM_URL);
+  updated.footer = footer;
+  if (updated.storyTitle) updated.storyTitle = replaceLegacyBrand(updated.storyTitle);
+
+  return updated;
+}
+
 function cleanText(value, field, maxLength, required = false) {
   const text = String(value ?? "").trim();
   if ((required && !text) || text.length > maxLength) {
@@ -26,6 +162,9 @@ function cleanHttpsUrl(value, field, optional = true) {
 }
 
 function validateSettings(body) {
+  if (typeof body.impressionTrackingEnabled !== "boolean") {
+    throw new Error("Impression tracking must be enabled or disabled.");
+  }
   const categories = Array.isArray(body.categories) ? body.categories : [];
   const homeCarousels = Array.isArray(body.homeCarousels)
     ? body.homeCarousels
@@ -122,6 +261,7 @@ function validateSettings(body) {
   const showroom = body.showroom || {};
   const shopColors = body.shopColors || {};
   return {
+    impressionTrackingEnabled: body.impressionTrackingEnabled,
     categories: cleanCategories,
     homeCarousels: cleanHomeCarousels,
     announcements: announcements.map((text) => cleanText(text, "Announcement", 250)).filter(Boolean),
@@ -159,21 +299,23 @@ function validateSettings(body) {
 router.get("/storefront-settings", async (req, res) => {
   try {
     const saved = await StorefrontSettings.findOne({ key: "storefront" }).lean();
-    const result = { ...DEFAULT_STOREFRONT_SETTINGS, ...(saved || {}) };
-    result.categories = saved ? (saved.categories || []) : DEFAULT_STOREFRONT_SETTINGS.categories;
-    result.homeCarousels = Array.isArray(saved?.homeCarousels)
-      ? saved.homeCarousels.map((section) => ({
+    const publicSettings = updateLegacyDefaultContent(saved);
+    const result = { ...DEFAULT_STOREFRONT_SETTINGS, ...(publicSettings || {}) };
+    result.categories = publicSettings ? (publicSettings.categories || []) : DEFAULT_STOREFRONT_SETTINGS.categories;
+    result.homeCarousels = Array.isArray(publicSettings?.homeCarousels)
+      ? publicSettings.homeCarousels.map((section) => ({
         ...section,
         collectionSlug: String(section.collectionSlug === undefined ? section.categorySlug || "" : section.collectionSlug).toLowerCase(),
       }))
       : DEFAULT_STOREFRONT_SETTINGS.homeCarousels;
-    result.announcements = saved ? (saved.announcements || []) : DEFAULT_STOREFRONT_SETTINGS.announcements;
-    result.shopColors = { ...DEFAULT_STOREFRONT_SETTINGS.shopColors, ...(saved?.shopColors || {}) };
-    result.locations = saved ? (saved.locations || []) : DEFAULT_STOREFRONT_SETTINGS.locations;
-    result.story = saved ? (saved.story || []) : DEFAULT_STOREFRONT_SETTINGS.story;
-    result.contact = { ...DEFAULT_STOREFRONT_SETTINGS.contact, ...(saved?.contact || {}) };
-    result.storyTitle = saved?.storyTitle || DEFAULT_STOREFRONT_SETTINGS.storyTitle;
-    result.footer = { ...DEFAULT_STOREFRONT_SETTINGS.footer, ...(saved?.footer || {}) };
+    result.announcements = publicSettings ? (publicSettings.announcements || []) : DEFAULT_STOREFRONT_SETTINGS.announcements;
+    result.shopColors = { ...DEFAULT_STOREFRONT_SETTINGS.shopColors, ...(publicSettings?.shopColors || {}) };
+    result.locations = publicSettings ? (publicSettings.locations || []) : DEFAULT_STOREFRONT_SETTINGS.locations;
+    result.story = publicSettings ? (publicSettings.story || []) : DEFAULT_STOREFRONT_SETTINGS.story;
+    result.contact = { ...DEFAULT_STOREFRONT_SETTINGS.contact, ...(publicSettings?.contact || {}) };
+    result.storyTitle = publicSettings?.storyTitle || DEFAULT_STOREFRONT_SETTINGS.storyTitle;
+    result.footer = { ...DEFAULT_STOREFRONT_SETTINGS.footer, ...(publicSettings?.footer || {}) };
+    result.impressionTrackingEnabled = publicSettings?.impressionTrackingEnabled === true;
     res.json(result);
   } catch (error) {
     console.error("Get storefront settings error:", error);
@@ -183,7 +325,14 @@ router.get("/storefront-settings", async (req, res) => {
 
 router.put("/admin/storefront-settings", requireAdmin, async (req, res) => {
   try {
-    const settings = validateSettings(req.body || {});
+    const body = { ...(req.body || {}) };
+    if (body.impressionTrackingEnabled === undefined) {
+      const current = await StorefrontSettings.findOne({ key: "storefront" })
+        .select("impressionTrackingEnabled")
+        .lean();
+      body.impressionTrackingEnabled = current?.impressionTrackingEnabled === true;
+    }
+    const settings = validateSettings(body);
     const saved = await StorefrontSettings.findOneAndUpdate(
       { key: "storefront" },
       { $set: settings },

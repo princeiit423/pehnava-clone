@@ -3,10 +3,12 @@ import { api } from "../api.js";
 import ProductCard from "../components/ProductCard.jsx";
 import CategoryStrip from "../components/CategoryStrip.jsx";
 import HomeFeatures from "../components/HomeFeatures.jsx";
-import { ProductSkeletons } from "../components/LoadingState.jsx";
+import { TrustHighlights } from "../components/TrustHighlights.jsx";
+import { LoadingState, ProductSkeletons } from "../components/LoadingState.jsx";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DEFAULT_HOME_CAROUSELS, getHomeCarouselProducts, getOrderedHomeCarousels } from "../utils/homeCarousels.js";
+import { useProductPages } from "../hooks/useProductPages.js";
 
 function optimizeHeroImage(url, width) {
   if (!url || !url.includes("res.cloudinary.com") || !url.includes("/image/upload/")) {
@@ -22,9 +24,18 @@ function optimizeHeroImage(url, width) {
 }
 
 export default function Home() {
-  const [products, setProducts] = useState([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-  const [productLoadError, setProductLoadError] = useState("");
+  const {
+    products,
+    loading: loadingProducts,
+    loadingMore,
+    hasMore,
+    error: productLoadError,
+    pageError,
+    loadMore,
+    retryFirstPage,
+    sentinelRef,
+    supportsAutoLoad,
+  } = useProductPages(50);
   const [currentHero, setCurrentHero] = useState(0);
   const [loadedHeroImages, setLoadedHeroImages] = useState([]);
   const [homepageContent, setHomepageContent] = useState({
@@ -49,13 +60,13 @@ export default function Home() {
   // HERO IMAGES
   // =========================
   const heroImages = [
-    "https://res.cloudinary.com/dvnwxbqqh/image/upload/v1788091504/Pehnava-Banner-lawns_xbl4up.webp",
-    "https://res.cloudinary.com/dvnwxbqqh/image/upload/v1792681376/Effortless_Elegance_Fashion_Editorial_xyyahu.png",
+    "/racoonbro-banner-desktop.svg",
+    "/racoonbro-banner-alt.svg",
   ];
 
   const mobileHeroImages = [
-    "https://res.cloudinary.com/dvnwxbqqh/image/upload/v1788115734/ratio-mobile-hero_siahdh.png",
-    "https://res.cloudinary.com/dvnwxbqqh/image/upload/v1788115801/ratio-mobile-hero-2_qbhncd.png",
+    "/racoonbro-banner-mobile.svg",
+    "/racoonbro-banner-mobile-alt.svg",
   ];
   const desktopSlides = homepageContent.heroDesktopImages.length
     ? homepageContent.heroDesktopImages
@@ -84,38 +95,6 @@ export default function Home() {
 
     return () => clearInterval(interval);
   }, [desktopSlides.length, loadedHeroImages]);
-
-  // =========================
-  // GET PRODUCTS
-  // =========================
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadProducts() {
-      try {
-        const res = await api.get("/products");
-
-        if (!cancelled) {
-          setProducts(Array.isArray(res.data) ? res.data : []);
-        }
-      } catch (err) {
-        console.error("Failed to load products:", err);
-
-        if (!cancelled) {
-          setProductLoadError("Products could not be loaded. Please refresh and try again.");
-          setProducts([]);
-        }
-      } finally {
-        if (!cancelled) setLoadingProducts(false);
-      }
-    }
-
-    loadProducts();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,7 +149,7 @@ export default function Home() {
         <Link
           to="/collections/trending"
           className="hero-link"
-          aria-label="Shop the New Drop"
+          aria-label="Shop RacoonBro everyday essentials"
         >
           {desktopSlides.map((image, index) => (
             <picture
@@ -185,7 +164,7 @@ export default function Home() {
               <img
                 className="hero-img"
                 src={optimizeHeroImage(image, 1920)}
-                alt={index === currentHero ? "Shop the New Drop" : ""}
+                alt={index === currentHero ? "RacoonBro everyday clothing" : ""}
                 loading={index === 0 ? "eager" : "lazy"}
                 fetchPriority={index === currentHero ? "high" : "low"}
                 decoding="async"
@@ -199,7 +178,10 @@ export default function Home() {
           ))}
         </Link>
       </section>
-      {productLoadError && <p className="loading-error home-load-error" role="alert">{productLoadError}</p>}
+      {productLoadError && <p className="loading-error home-load-error" role="alert">
+        Products could not be loaded. <button type="button" onClick={retryFirstPage}>Retry</button>
+      </p>}
+      <TrustHighlights />
 
       {/* =========================
           OUR CATEGORY
@@ -246,6 +228,10 @@ export default function Home() {
         })}
 
       <HomeFeatures products={products} content={homepageContent} storefrontSettings={storefrontSettings} showShowroom />
+      {pageError && <p className="loading-error home-load-error" role="alert">More products could not be loaded. <button type="button" onClick={loadMore}>Retry</button></p>}
+      {loadingMore && <LoadingState label="Loading more products" />}
+      {hasMore && <div ref={sentinelRef} aria-hidden="true" />}
+      {hasMore && !loadingMore && !supportsAutoLoad && <button type="button" onClick={loadMore}>Load more products</button>}
     </main>
   );
 }

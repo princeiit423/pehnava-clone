@@ -5,14 +5,24 @@ import ProductCard from "../components/ProductCard.jsx";
 import FilterSidebar from "../components/FilterSidebar.jsx";
 import { LoadingState, ProductSkeletons } from "../components/LoadingState.jsx";
 import { getCategoryConfig } from "../categories.js";
+import { useProductPages } from "../hooks/useProductPages.js";
 
 export default function Collection() {
   const { slug } = useParams();
 
-  const [all, setAll] = useState([]);
+  const {
+    products: all,
+    loading,
+    loadingMore,
+    hasMore,
+    error: pageLoadError,
+    pageError,
+    loadMore,
+    loadAll,
+    retryFirstPage,
+    sentinelRef,
+  } = useProductPages(24);
   const [storefrontCategories, setStorefrontCategories] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
 
   const [filters, setFilters] = useState({
     minPrice: "",
@@ -23,9 +33,14 @@ export default function Collection() {
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortBy, setSortBy] = useState("featured");
+  const hasActiveFilters = Object.values(filters).some(Boolean);
   const config = storefrontCategories
     ? storefrontCategories.find((category) => category.slug === slug && category.active !== false)
     : getCategoryConfig(slug);
+
+  useEffect(() => {
+    if ((sortBy !== "featured" || hasActiveFilters) && hasMore) loadAll();
+  }, [hasActiveFilters, hasMore, loadAll, sortBy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,26 +52,6 @@ export default function Collection() {
       })
       .catch((error) => {
         console.error("Failed to load storefront categories:", error);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    api.get("/products")
-      .then((res) => {
-        if (!cancelled) setAll(Array.isArray(res.data) ? res.data : []);
-      })
-      .catch((error) => {
-        console.error("Failed to load collection products:", error);
-        if (!cancelled) setLoadError("Products could not be loaded. Please refresh and try again.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
 
     return () => {
@@ -173,8 +168,8 @@ return (
       />
 
       <div className="collection-results">
-      {!loading && !loadError && <div className="collection-toolbar">
-        <span>{filtered.length} {filtered.length === 1 ? "product" : "products"}</span>
+      {!loading && !pageLoadError && <div className="collection-toolbar">
+        <span>Showing {filtered.length} {filtered.length === 1 ? "product" : "products"}</span>
         <label>Sort by
           <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
             <option value="featured">Featured</option>
@@ -191,8 +186,11 @@ return (
             <LoadingState label="Loading collection" />
             <ProductSkeletons count={8} />
           </>
-        ) : loadError ? (
-          <p className="loading-error" role="alert">{loadError}</p>
+        ) : pageLoadError ? (
+          <div className="loading-error" role="alert">
+            <p>Products could not be loaded. Please try again.</p>
+            <button type="button" onClick={retryFirstPage}>Retry</button>
+          </div>
         ) : filtered.length === 0 ? (
           <p>No products match these filters yet.</p>
         ) : filtered.map((p) => (
@@ -202,6 +200,10 @@ return (
           />
         ))}
       </div>
+      {pageError && <p className="loading-error" role="alert">More products could not be loaded. <button type="button" onClick={sortBy !== "featured" || hasActiveFilters ? loadAll : loadMore}>Retry</button></p>}
+      {loadingMore && <LoadingState label="Loading more products" />}
+      {hasMore && <div ref={sentinelRef} aria-hidden="true" />}
+      {hasMore && !loadingMore && typeof IntersectionObserver === "undefined" && <button type="button" onClick={loadMore}>Load more products</button>}
       </div>
 
     </div>

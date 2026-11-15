@@ -18,7 +18,9 @@ import Contact from "./pages/Contact.jsx";
 import Account from "./pages/Account.jsx";
 import AdminHomepageContent from "./pages/AdminHomepageContent.jsx";
 import AdminStorefrontSettings from "./pages/AdminStorefrontSettings.jsx";
+import AdminCoupons from "./pages/AdminCoupons.jsx";
 import Checkout from "./pages/Checkout.jsx";
+import Cart from "./pages/Cart.jsx";
 import MobileBottomNav from "./components/MobileBottomNav.jsx";
 export default function App() {
   const location = useLocation();
@@ -37,15 +39,18 @@ export default function App() {
           <Route path="/products/:slug" element={<ProductDetail />} />
           <Route path="/search" element={<Search />} />
           <Route path="/likes" element={<Likes />} />
+          <Route path="/cart" element={<Cart />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/products" element={<AdminDashboard />} />
           <Route path="/admin/add-product" element={<AdminDashboard />} />
           <Route path="/admin/sales" element={<AdminDashboard />} />
           <Route path="/admin/orders" element={<AdminDashboard />} />
+          <Route path="/admin/returns" element={<AdminDashboard />} />
           <Route path="/admin/customers" element={<AdminDashboard />} />
           <Route path="/admin/homepage-content" element={<AdminHomepageContent />} />
           <Route path="/admin/settings/:section" element={<AdminStorefrontSettings />} />
+          <Route path="/admin/coupons" element={<AdminCoupons />} />
           <Route path="/account" element={<Account />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/shipping-and-delivery-policy" element={<ShippingPolicy />} />

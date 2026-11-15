@@ -1,5 +1,5 @@
 {
-  "name": "kashmir-cloth-stores-client",
+  "name": "racoonbro-store-client",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -13,11 +13,11 @@
     "lucide-react": "^1.37.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.25.1"
+    "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
-    "vite": "^5.3.4",
-    "vitest": "^2.1.9"
+    "vite": "^6.4.5",
+    "vitest": "^4.1.12"
   }
 }

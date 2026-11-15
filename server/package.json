@@ -1,5 +1,5 @@
 {
-  "name": "kashmir-cloth-stores-server",
+  "name": "racoonbro-store-server",
   "version": "1.0.0",
   "type": "module",
   "main": "server.js",
@@ -19,6 +19,7 @@
     "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.7.3",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^1.37.0",
     "mongoose": "^8.5.0",
@@ -29,6 +30,7 @@
   },
   "overrides": {
     "qs": "6.16.2",
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "minimatch": "11.0.1"
   }
 }

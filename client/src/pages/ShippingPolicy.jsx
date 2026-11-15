@@ -7,7 +7,7 @@ export default function ShippingPolicy() {
         <h1>Shipping and Delivery policy</h1>
 
         <p>
-          At Kashmir Cloth Stores, we are committed to delivering your
+          At RacoonBro, we are committed to delivering your
           orders accurately, in good condition, and always on time. We work
           with trusted shipping partners to ensure that your orders are
           delivered to you in the shortest time possible.

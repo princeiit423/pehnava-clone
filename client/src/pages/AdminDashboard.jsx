@@ -5,9 +5,12 @@ import { api, setAdminToken } from "../api.js";
 import { CATEGORIES } from "../categories.js";
 import { Bell, Mail, MessageCircle, Printer } from "lucide-react";
 import { downloadReportPdf, downloadReportPng } from "../utils/adminExports.js";
+import { filterRecordsByDate } from "../utils/adminDateFilter.js";
+import { parseProductImageUrls } from "../utils/productImages.js";
 import { useToast } from "../components/Toast.jsx";
 import "./AdminOrderPrint.css";
 import "./AdminOrderNotifications.css";
+import "./AdminDashboard.css";
 
 const EMPTY = {
   title: "",
@@ -16,32 +19,62 @@ const EMPTY = {
   discount: 0,
   stock: 1,
   images: "",
-  type: "Stitched/Ready to Wear",
+  type: "T-Shirt",
   fabric: "Cotton",
-  dupatta: "Cotton",
+  fit: "",
+  occasion: "",
   colorsText: "",
-  sizesText: "Free Size",
+  sizesText: "S, M, L, XL",
   categories: [],
+  codEligible: true,
   soldOut: false,
   isNew: true,
   description: "",
-  careGuide: "Dry wash only.",
+  careGuide: "Machine wash cold with like colors.",
   shipping:
     "Free shipping all over India. Dispatched in 3-5 days.",
   variantStockText: "",
 };
 
 const SIZE_OPTIONS = [
-  "Free Size",
+  "XS",
   "S",
   "M",
   "L",
   "XL",
   "XXL",
   "XXXL",
-  "Unstitched",
-  "Custom",
+  "28",
+  "30",
+  "32",
+  "34",
+  "36",
+  "38",
+  "40",
+  "42",
+  "44",
+  "Free Size",
 ];
+
+const PRODUCT_TYPES = [
+  "T-Shirt",
+  "Polo Shirt",
+  "Shirt",
+  "Jeans",
+  "Chinos",
+  "Trousers",
+  "Joggers",
+  "Shorts",
+  "Hoodie",
+  "Sweatshirt",
+  "Jacket",
+  "Overshirt",
+  "Tracksuit",
+  "Accessories",
+];
+
+const FIT_OPTIONS = ["Regular", "Slim", "Relaxed", "Oversized", "Straight"];
+const OCCASION_OPTIONS = ["Everyday", "Work", "Casual", "Travel", "Training"];
 
 const COLOR_PALETTE = [
   ["Black", "#111111"],
@@ -70,38 +103,6 @@ function hasValidCustomerEmail(value) {
 
 function customerDisplayId(customer) {
   return customer.customerId || `CUS-${String(customer._id || "").toUpperCase()}`;
-}
-
-function filterRecordsByDate(records, filter) {
-  if (!filter || filter.period === "all") return records;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  let start = null;
-  let end = new Date(today);
-
-  if (filter.period === "today") start = today;
-  if (filter.period === "this_week") {
-    start = new Date(today);
-    start.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-  }
-  if (filter.period === "this_month") start = new Date(today.getFullYear(), today.getMonth(), 1);
-  if (filter.period === "this_year") start = new Date(today.getFullYear(), 0, 1);
-  if (filter.period === "last_year") {
-    start = new Date(today.getFullYear() - 1, 0, 1);
-    end = new Date(today.getFullYear() - 1, 11, 31);
-  }
-  if (filter.period === "custom") {
-    start = filter.start ? new Date(`${filter.start}T00:00:00`) : null;
-    end = filter.end ? new Date(`${filter.end}T23:59:59.999`) : null;
-  } else {
-    end.setHours(23, 59, 59, 999);
-  }
-
-  return records.filter((record) => {
-    const created = new Date(record.createdAt);
-    if (Number.isNaN(created.getTime())) return false;
-    return (!start || created >= start) && (!end || created <= end);
-  });
 }
 
 function normalizedOrderStatus(status) {
@@ -204,6 +205,7 @@ export default function AdminDashboard() {
   const [inventoryCategory, setInventoryCategory] = useState("all");
   const [editingOrderId, setEditingOrderId] = useState("");
   const [orderAddressDraft, setOrderAddressDraft] = useState(null);
+  const [returnReviewNotes, setReturnReviewNotes] = useState({});
   const [editingCustomerId, setEditingCustomerId] = useState("");
   const [customerDraft, setCustomerDraft] = useState({ name: "", phone: "", email: "" });
   const [newCustomerDraft, setNewCustomerDraft] = useState({ name: "", phone: "", email: "" });
@@ -217,6 +219,7 @@ export default function AdminDashboard() {
   const [showSalesHistory, setShowSalesHistory] = useState(false);
   const [productPreview, setProductPreview] = useState(null);
   const [savingProduct, setSavingProduct] = useState(false);
+  const [savingCodEligibility, setSavingCodEligibility] = useState({});
   const [savingManualOrder, setSavingManualOrder] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState("");
   const [notificationPermission, setNotificationPermission] = useState(
@@ -300,13 +303,15 @@ export default function AdminDashboard() {
         .filter((variant) => variant.color === manualOrder.color && Number(variant.stock) > 0)
         .map((variant) => variant.size)
         .filter(Boolean))]
-    : (manualProduct?.sizes?.length ? manualProduct.sizes : ["Free Size"]);
+    : (manualProduct?.sizes?.length ? manualProduct.sizes : ["S"]);
   const manualMaxStock = manualOrderStock(manualProduct, manualOrder.color, manualOrder.size);
 
   const adminPage = location.pathname.endsWith("/dashboard")
     ? "overview"
     : location.pathname.endsWith("/orders")
       ? "orders"
+      : location.pathname.endsWith("/returns")
+    ? "returns"
       : location.pathname.endsWith("/customers")
         ? "customers"
         : location.pathname.endsWith("/sales")
@@ -352,6 +357,13 @@ export default function AdminDashboard() {
   });
   const monthlyOrderValue = monthlyOrders.reduce((total, order) => total + (Number(order.total) || 0), 0);
   const activeOrders = orders.filter((order) => !["delivered", "cancelled_refund"].includes(normalizedOrderStatus(order.status)));
+  const returnOrders = orders
+    .filter((order) => order.returnRequest)
+    .sort((left, right) => {
+      const pendingOrder = Number(right.returnRequest.status === "requested") - Number(left.returnRequest.status === "requested");
+      return pendingOrder || new Date(right.returnRequest.requestedAt) - new Date(left.returnRequest.requestedAt);
+    });
+  const pendingReturnCount = returnOrders.filter((order) => order.returnRequest.status === "requested").length;
   const attentionOrders = activeOrders
     .filter((order) => ["order_placed", "payment_confirmed", "processing_packed", "out_for_delivery"].includes(normalizedOrderStatus(order.status)))
     .sort((left, right) => new Date(left.createdAt) - new Date(right.createdAt))
@@ -384,6 +396,26 @@ export default function AdminDashboard() {
 
   function filteredReportRecords(type, records) {
     return filterRecordsByDate(records, reportFilters[type]);
+  }
+
+  const filteredOrderRecords = filteredReportRecords("orders", orders);
+  const filteredOrderPage = paged(filteredOrderRecords, "orders");
+  const selectedOrderValue = filteredOrderRecords.reduce(
+    (total, order) => total + (
+      confirmedStatuses.has(normalizedOrderStatus(order.status))
+        ? Number(order.total) || 0
+        : 0
+    ),
+    0
+  );
+  const orderCountReference = new Date();
+  const todayOrderCount = filterRecordsByDate(orders, { period: "today" }, orderCountReference).length;
+  const weekOrderCount = filterRecordsByDate(orders, { period: "this_week" }, orderCountReference).length;
+  const monthOrderCount = filterRecordsByDate(orders, { period: "this_month" }, orderCountReference).length;
+
+  function updateOrderDateFilter(value) {
+    setReportFilters((current) => ({ ...current, orders: value }));
+    setPages((current) => ({ ...current, orders: 1 }));
   }
 
   function customerExportRows() {
@@ -431,6 +463,24 @@ export default function AdminDashboard() {
             "Unable to load products"
         );
       });
+  }
+
+  async function toggleProductCodEligibility(product) {
+    const codEligible = product.codEligible === false;
+    setSavingCodEligibility((current) => ({ ...current, [product._id]: true }));
+    try {
+      const { data } = await api.patch(`/products/${product._id}/cod-eligibility`, { codEligible });
+      setProducts((current) => current.map((item) => item._id === product._id ? data : item));
+      if (editingId === product._id) {
+        setForm((current) => ({ ...current, codEligible }));
+      }
+      setError("");
+      showToast(`${product.title}: cash on delivery ${codEligible ? "enabled" : "disabled"}.`);
+    } catch (err) {
+      setError(err.response?.data?.message || `Unable to update COD eligibility for ${product.title}.`);
+    } finally {
+      setSavingCodEligibility((current) => ({ ...current, [product._id]: false }));
+    }
   }
 
 
@@ -681,12 +731,14 @@ export default function AdminDashboard() {
       ),
       type: p.type,
       fabric: p.fabric,
-      dupatta: p.dupatta,
+      fit: p.fit || "",
+      occasion: p.occasion || "",
       colorsText: "",
       sizesText: (p.sizes || []).join(
         ", "
       ),
       categories: p.categories || [],
+      codEligible: p.codEligible !== false,
       soldOut: p.soldOut,
       isNew: p.isNew,
       description: p.description,
@@ -757,6 +809,20 @@ export default function AdminDashboard() {
       setError("");
     } catch (err) {
       setError(err.response?.data?.message || "Unable to update order");
+    }
+  }
+
+  async function reviewReturnRequest(order, status) {
+    try {
+      const response = await api.patch(`/admin/orders/${order._id}/return-request`, {
+        status,
+        adminNote: returnReviewNotes[order._id] || "",
+      });
+      setOrders((current) => current.map((item) => item._id === order._id ? response.data : item));
+      setReturnReviewNotes((current) => ({ ...current, [order._id]: "" }));
+      setError("");
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to update return or exchange request");
     }
   }
 
@@ -1063,7 +1129,7 @@ export default function AdminDashboard() {
       "Customer"
     },
 
-Order update from Kashmir Cloth Stores
+Order update from RacoonBro
 Order ID: #${orderId}
 Status: ${order.status}
 Payment: ${order.paymentMethod}
@@ -1095,7 +1161,7 @@ ${
       }\n`
     : ""
 }
-Thank you for shopping with Kashmir Cloth Stores.`;
+Thank you for shopping with RacoonBro.`;
   }
 
 
@@ -1150,7 +1216,7 @@ function sendStructuredEmail(order) {
     .toUpperCase();
 
   const subject =
-    `Kashmir Cloth Stores order #${orderId} update`;
+    `RacoonBro order #${orderId} update`;
 
   const body = getOrderMessage(order);
 
@@ -1478,10 +1544,7 @@ function sendStructuredEmail(order) {
       soldOut: productStockTotal <= 0,
 
       images:
-        form.images
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
+        parseProductImageUrls(form.images),
 
       type:
         form.type,
@@ -1489,8 +1552,8 @@ function sendStructuredEmail(order) {
       fabric:
         form.fabric,
 
-      dupatta:
-        form.dupatta,
+      fit: form.fit,
+      occasion: form.occasion,
 
       colors:
         colorRows.map(
@@ -1500,13 +1563,7 @@ function sendStructuredEmail(order) {
             stock: colorStockTotal(color),
 
             images:
-              color.images
-                .split(",")
-                .map(
-                  (image) =>
-                    image.trim()
-                )
-                .filter(Boolean),
+              parseProductImageUrls(color.images),
           })
         ),
 
@@ -1552,6 +1609,9 @@ function sendStructuredEmail(order) {
       categories:
         form.categories,
 
+      codEligible:
+        form.codEligible,
+
       isNew:
         form.isNew,
 
@@ -1594,7 +1654,8 @@ function sendStructuredEmail(order) {
     0
   );
   const printableTotal = Number(printOrder?.total || 0);
-  const printableAdjustment = printableTotal - printableSubtotal;
+  const printableCodFee = Number(printOrder?.codFee || 0);
+  const printableAdjustment = printableTotal - printableSubtotal - printableCodFee;
   const printableAddress = printOrder?.shippingAddress || {};
   const printableStatus = orderPhases.find(
     ([status]) => status === normalizedOrderStatus(printOrder?.status)
@@ -1617,7 +1678,10 @@ function sendStructuredEmail(order) {
       ======================================================= */}
 
       <div className="admin-head">
-        <h2>Admin Panel — {adminPage[0].toUpperCase() + adminPage.slice(1)}</h2>
+        <div className="admin-brand-heading">
+          <p className="admin-brand-eyebrow">RACOONBRO · STORE OPERATIONS</p>
+          <h2>{adminPage === "add-product" ? (editingId ? "Edit product" : "Add a product") : adminPage === "overview" ? "Admin dashboard" : adminPage[0].toUpperCase() + adminPage.slice(1)}</h2>
+        </div>
 
         <div className="admin-head-actions">
           <button className={`admin-section-tab${adminPage === "overview" ? " is-active" : ""}`} type="button" onClick={() => navigate("/admin/dashboard")}>Overview</button>
@@ -1625,6 +1689,9 @@ function sendStructuredEmail(order) {
           <button className={`admin-section-tab${adminPage === "add-product" ? " is-active" : ""}`} type="button" onClick={() => { resetForm(); navigate("/admin/add-product"); }}>Add Product</button>
           <button className={`admin-section-tab${adminPage === "sales" ? " is-active" : ""}`} type="button" onClick={() => navigate("/admin/sales")}>Sales</button>
           <button className={`admin-section-tab${adminPage === "orders" ? " is-active" : ""}`} type="button" onClick={() => navigate("/admin/orders")}>Orders</button>
+          <button className={`admin-section-tab${adminPage === "returns" ? " is-active" : ""}`} type="button" onClick={() => navigate("/admin/returns")}>
+            Returns {pendingReturnCount > 0 && <span className="admin-return-count">{pendingReturnCount}</span>}
+          </button>
           <button className={`admin-section-tab${adminPage === "customers" ? " is-active" : ""}`} type="button" onClick={() => navigate("/admin/customers")}>Customers</button>
           <button
             type="button"
@@ -1634,6 +1701,9 @@ function sendStructuredEmail(order) {
           </button>
           <button type="button" onClick={() => navigate("/admin/settings/categories")}>
             Storefront settings
+          </button>
+          <button className={`admin-section-tab${adminPage === "coupons" ? " is-active" : ""}`} type="button" onClick={() => navigate("/admin/coupons")}>
+            Coupons
           </button>
           <button onClick={logout}>
             Logout
@@ -1854,11 +1924,13 @@ function sendStructuredEmail(order) {
         className={`admin-form${editingId ? " is-editing" : ""}`}
         onSubmit={handleSubmit}
       >
-        <h3>
-          {editingId
-            ? "Edit Product"
-            : "Add New Product"}
-        </h3>
+        <div className="admin-form-heading">
+          <div>
+            <p className="admin-brand-eyebrow">PRODUCT CATALOG</p>
+            <h3>{editingId ? "Edit product details" : "Add a new product"}</h3>
+            <p>Manage menswear details, sizes, colorways and stock.</p>
+          </div>
+        </div>
 
         {error && (
           <p className="error">
@@ -1868,8 +1940,13 @@ function sendStructuredEmail(order) {
 
         <div className="admin-grid">
 
+          <div className="admin-form-section-heading span-2">
+            <strong>Product basics</strong>
+            <span>Start with the item name and selling price.</span>
+          </div>
+
           <label>
-            Title
+            Product name
 
             <input
               value={form.title}
@@ -1886,7 +1963,7 @@ function sendStructuredEmail(order) {
 
 
           <label>
-            SKU / Code
+            SKU / product code
 
             <input
               value={form.sku}
@@ -1907,6 +1984,8 @@ function sendStructuredEmail(order) {
 
             <input
               type="number"
+              min="0"
+              step="0.01"
               value={form.price}
               onChange={(e) =>
                 setForm({
@@ -1969,11 +2048,16 @@ function sendStructuredEmail(order) {
             />
           </label>
 
+          <div className="admin-form-section-heading span-2">
+            <strong>Menswear details</strong>
+            <span>Choose the garment, fit and fabric customers need to know.</span>
+          </div>
 
           <label>
-            Type
+            Garment type
 
             <input
+              list="racoonbro-product-types"
               value={form.type}
               onChange={(e) =>
                 setForm({
@@ -1983,6 +2067,9 @@ function sendStructuredEmail(order) {
                 })
               }
             />
+            <datalist id="racoonbro-product-types">
+            {PRODUCT_TYPES.map((type) => <option key={type} value={type} />)}
+            </datalist>
           </label>
 
 
@@ -2001,28 +2088,50 @@ function sendStructuredEmail(order) {
             />
           </label>
 
-
           <label>
-            Dupatta
+            Fit
 
             <input
-              value={form.dupatta}
+              list="racoonbro-fit-options"
+              value={form.fit}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  dupatta:
+                  fit:
                     e.target.value,
                 })
               }
+              placeholder="e.g. Regular"
             />
+            <datalist id="racoonbro-fit-options">
+              {FIT_OPTIONS.map((fit) => <option key={fit} value={fit} />)}
+            </datalist>
           </label>
 
-
-          <label className="span-2">
-            Image URLs
-            (comma separated)
+          <label>
+            Best for
 
             <input
+              list="racoonbro-occasion-options"
+              value={form.occasion}
+              onChange={(e) => setForm({ ...form, occasion: e.target.value })}
+              placeholder="e.g. Everyday"
+            />
+            <datalist id="racoonbro-occasion-options">
+              {OCCASION_OPTIONS.map((occasion) => <option key={occasion} value={occasion} />)}
+            </datalist>
+          </label>
+
+          <div className="admin-form-section-heading span-2">
+            <strong>Photos and colorways</strong>
+            <span>Add the main product photos, then set color and size-level stock.</span>
+          </div>
+
+          <label className="span-2">
+            Product image URLs
+            <small>Paste one image link per line, or separate links with commas.</small>
+
+            <textarea
               value={form.images}
               onChange={(e) =>
                 setForm({
@@ -2031,7 +2140,8 @@ function sendStructuredEmail(order) {
                     e.target.value,
                 })
               }
-              placeholder="https://... , https://..."
+              placeholder={"https://example.com/front.jpg\nhttps://example.com/back.jpg"}
+              rows={3}
             />
           </label>
 
@@ -2039,7 +2149,8 @@ function sendStructuredEmail(order) {
           {/* COLORS */}
 
           <div className="span-2 product-inventory-field">
-            <h4>Colors and shade photos</h4>
+            <h4>Colorways</h4>
+            <p className="product-inventory-help">Add the colors customers can choose. Use a photo URL for each color only when it has a different product image.</p>
 
             <div className="palette-picker">
 
@@ -2228,7 +2339,7 @@ function sendStructuredEmail(order) {
                       value={
                         color.images
                       }
-                      placeholder="Shade photo URL(s), comma separated"
+                      placeholder="Color photo links, one per line or comma separated"
                       onChange={(e) =>
                         setColorRows(
                           (rows) =>
@@ -2274,8 +2385,8 @@ function sendStructuredEmail(order) {
           {/* VARIANTS */}
 
           <div className="span-2 product-inventory-field">
-            <h4>Size-wise quantity by color</h4>
-            <p className="product-inventory-help">Each row shows its size, selected color, and piece count. A color keeps its current quantity until you add size rows for that color.</p>
+            <h4>Size and stock</h4>
+            <p className="product-inventory-help">Set stock for each size and color combination. Use standard letter sizes or numeric waist sizes in inches.</p>
 
             <div className="variant-editor">
 
@@ -2360,7 +2471,7 @@ function sendStructuredEmail(order) {
               </button>
               <div className="custom-size-controls">
                 <label>
-                  Custom size name
+                  Add another size
                   <input
                     value={customSizeName}
                     maxLength={40}
@@ -2371,10 +2482,10 @@ function sendStructuredEmail(order) {
                         addCustomSize();
                       }
                     }}
-                    placeholder="e.g. 4XL or 38"
+                    placeholder="e.g. 4XL or 30"
                   />
                 </label>
-                <button type="button" onClick={addCustomSize}>Add custom size</button>
+                <button type="button" onClick={addCustomSize}>Add size</button>
               </div>
 
             </div>
@@ -2388,9 +2499,13 @@ function sendStructuredEmail(order) {
 
           </div>
 
+          <div className="admin-form-section-heading span-2">
+            <strong>Description and placement</strong>
+            <span>Help customers understand the item and make it easy to discover.</span>
+          </div>
 
           <label className="span-2">
-            Description
+            Product description
 
             <textarea
               value={
@@ -2408,7 +2523,7 @@ function sendStructuredEmail(order) {
 
 
           <label className="span-2">
-            Care Guide
+            Care instructions
 
             <textarea
               value={
@@ -2455,6 +2570,22 @@ function sendStructuredEmail(order) {
               />
 
               Mark as New
+            </label>
+
+            <label>
+              <input
+                type="checkbox"
+                checked={form.codEligible}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    codEligible: e.target.checked,
+                  })
+                }
+              />
+
+              <span>Allow Cash on Delivery (COD)</span>
+              <small>Turn this off to require online payment for this product.</small>
             </label>
 
           </div>
@@ -2527,6 +2658,7 @@ function sendStructuredEmail(order) {
           <section className="product-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="product-preview-title">
             <h3 id="product-preview-title">Review product stock before saving</h3>
             <p><strong>{productPreview.title}</strong> · SKU {productPreview.sku}</p>
+            <p>Cash on delivery: <strong>{productPreview.codEligible ? "Eligible (4% handling fee)" : "Not available"}</strong></p>
             <p className="product-preview-total">Total quantity: <strong>{productPreview.stock} pieces</strong></p>
             {productPreview.colors.length ? (
               <div className="product-preview-colors">
@@ -2555,6 +2687,7 @@ function sendStructuredEmail(order) {
       ======================================================= */}
 
       <section className="admin-products-list">
+      {error && <p className="error" role="alert">{error}</p>}
       <h3>
         All Products ({
           products.length
@@ -2585,6 +2718,7 @@ function sendStructuredEmail(order) {
             <th>SKU</th>
             <th>Price</th>
             <th>Categories</th>
+            <th>COD</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -2614,6 +2748,9 @@ function sendStructuredEmail(order) {
 
               <td>
                 {p.title}
+                <small className="admin-product-meta">
+                  {[p.type, p.fit].filter(Boolean).join(" · ") || "Menswear"}
+                </small>
               </td>
 
               <td>
@@ -2625,10 +2762,32 @@ function sendStructuredEmail(order) {
               </td>
 
               <td>
-                {(
-                  p.categories ||
-                  []
-                ).join(", ")}
+                <div className="admin-category-chips">
+                  {(p.categories || []).map((category) => (
+                    <span key={category}>
+                      {tagCategories.find((entry) => entry.tag === category)?.label
+                        || category.replace(/-/g, " ")}
+                    </span>
+                  ))}
+                  {!p.categories?.length && <span>Uncategorized</span>}
+                </div>
+              </td>
+
+              <td>
+                <button
+                  type="button"
+                  className={`admin-cod-toggle${p.codEligible === false ? " is-disabled" : " is-enabled"}`}
+                  aria-pressed={p.codEligible !== false}
+                  aria-label={`${p.codEligible === false ? "Enable" : "Disable"} cash on delivery for ${p.title}`}
+                  disabled={Boolean(savingCodEligibility[p._id])}
+                  onClick={() => toggleProductCodEligibility(p)}
+                >
+                  {savingCodEligibility[p._id]
+                    ? "Saving…"
+                    : p.codEligible === false
+                      ? "Enable COD"
+                      : "COD enabled"}
+                </button>
               </td>
 
               <td>
@@ -3058,7 +3217,7 @@ function sendStructuredEmail(order) {
       <section className="admin-section" id="admin-orders-list">
 
         <div className="admin-orders-heading">
-          <h3>Orders ({orders.length})</h3>
+          <h3>Orders ({filteredOrderRecords.length} of {orders.length})</h3>
           <div className="admin-order-notification-control">
             {notificationPermission === "default" && (
               <button type="button" onClick={enableBrowserNotifications}>
@@ -3119,8 +3278,30 @@ function sendStructuredEmail(order) {
         <ReportDateFilter
           label="Orders date range"
           value={reportFilters.orders}
-          onChange={(value) => setReportFilters((current) => ({ ...current, orders: value }))}
+          onChange={updateOrderDateFilter}
         />
+        <div className="admin-orders-date-metrics" aria-label="Order counts by date">
+          <article className="admin-orders-date-metric is-selected">
+            <span>Orders in selected range</span>
+            <strong>{filteredOrderRecords.length}</strong>
+            <small>Confirmed order value: Rs. {selectedOrderValue.toLocaleString("en-IN")}</small>
+          </article>
+          <article className="admin-orders-date-metric">
+            <span>Today</span>
+            <strong>{todayOrderCount}</strong>
+            <small>{todayOrderCount === 1 ? "order" : "orders"}</small>
+          </article>
+          <article className="admin-orders-date-metric">
+            <span>This week</span>
+            <strong>{weekOrderCount}</strong>
+            <small>{weekOrderCount === 1 ? "order" : "orders"}</small>
+          </article>
+          <article className="admin-orders-date-metric">
+            <span>This month</span>
+            <strong>{monthOrderCount}</strong>
+            <small>{monthOrderCount === 1 ? "order" : "orders"}</small>
+          </article>
+        </div>
         <div className="admin-export-actions" aria-label="Download orders">
           <button type="button" onClick={() => exportReport("pdf", "Orders report", ["Order", "Customer", "Phone", "Items", "Total", "Status", "Date"], orderExportRows())}>Print / Save PDF ({filteredReportRecords("orders", orders).length})</button>
           <button type="button" onClick={() => exportReport("image", "Orders report", ["Order", "Customer", "Phone", "Items", "Total", "Status", "Date"], orderExportRows())}>Download image ({filteredReportRecords("orders", orders).length})</button>
@@ -3143,7 +3324,7 @@ function sendStructuredEmail(order) {
 
         <div className="admin-table-scroll">
 
-          <table className="admin-table">
+          <table className="admin-table admin-orders-table">
 
             <thead>
 
@@ -3182,10 +3363,7 @@ function sendStructuredEmail(order) {
 
             <tbody>
 
-              {paged(
-                orders,
-                "orders"
-              ).rows.map(
+              {filteredOrderPage.rows.length ? filteredOrderPage.rows.map(
                 (order) => (
 
                   <React.Fragment
@@ -3369,17 +3547,17 @@ function sendStructuredEmail(order) {
                       =================================================== */}
 
                       <td
-                        className="order-contact-actions"
                         onClick={(event) =>
                           event.stopPropagation()
                         }
                       >
-
-                        <button
+                        <div className="order-contact-actions">
+                          <button
                           type="button"
                           className="contact-button whatsapp-button"
-                          title="Send order details on WhatsApp"
+                          title={order.shippingAddress?.phone || order.customer?.phone ? "Send order details on WhatsApp" : "No customer phone number is available"}
                           aria-label="Send order details on WhatsApp"
+                          disabled={!order.shippingAddress?.phone && !order.customer?.phone}
                           onClick={() =>
                             openWhatsApp(
                               order
@@ -3391,14 +3569,15 @@ function sendStructuredEmail(order) {
                           />
 
                           WhatsApp
-                        </button>
+                          </button>
 
 
-                        <button
+                          <button
                           type="button"
                           className="contact-button email-button"
-                          title="Send structured HTML order email"
+                          title={order.shippingAddress?.email || order.customer?.email ? "Send structured HTML order email" : "No customer email address is available"}
                           aria-label="Send structured HTML order email"
+                          disabled={!order.shippingAddress?.email && !order.customer?.email}
                           onClick={() =>
                             sendStructuredEmail(
                               order
@@ -3410,7 +3589,8 @@ function sendStructuredEmail(order) {
                           />
 
                           Email
-                        </button>
+                          </button>
+                        </div>
 
                       </td>
 
@@ -3436,6 +3616,18 @@ function sendStructuredEmail(order) {
                         >
 
                           <div className="order-detail-panel">
+
+                            {order.codFee > 0 && (
+                              <p className="admin-cod-fee-note">
+                                COD cash-handling fee: Rs. {Number(order.codFee).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {" · "}Items subtotal: Rs. {Number(order.itemSubtotal ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            )}
+                            {order.couponDiscount > 0 && (
+                              <p className="admin-cod-fee-note">
+                                Coupon {order.couponCode}: − Rs. {Number(order.couponDiscount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            )}
 
                             <div className="order-detail-items">
 
@@ -3730,6 +3922,12 @@ function sendStructuredEmail(order) {
                   </React.Fragment>
 
                 )
+              ) : (
+                <tr>
+                  <td colSpan="7" className="admin-orders-empty">
+                    No orders match this date range and search.
+                  </td>
+                </tr>
               )}
 
             </tbody>
@@ -3738,10 +3936,7 @@ function sendStructuredEmail(order) {
 
 
           <Pagination
-            {...paged(
-              orders,
-              "orders"
-            )}
+            {...filteredOrderPage}
             onChange={(value) =>
               setPages(
                 (current) => ({
@@ -3758,11 +3953,80 @@ function sendStructuredEmail(order) {
       </section>
       </div>
 
+      <div className="admin-page-area admin-returns-area">
+        <section className="admin-section">
+          <div className="admin-returns-heading">
+            <div>
+              <p className="admin-brand-eyebrow">CUSTOMER CARE</p>
+              <h3>Returns &amp; exchanges</h3>
+              <p>Review requests submitted within 7 days after delivery.</p>
+            </div>
+            <span className="admin-return-count-large">{pendingReturnCount} pending</span>
+          </div>
+
+          {error && <p className="error" role="alert">{error}</p>}
+          {returnOrders.length ? (
+            <div className="admin-return-list">
+              {returnOrders.map((order) => {
+                const request = order.returnRequest;
+                const address = order.shippingAddress || {};
+                return (
+                  <article className="admin-return-card" key={order._id}>
+                    <div className="admin-return-card-head">
+                      <div>
+                        <span className={`admin-return-status is-${request.status}`}>{request.status}</span>
+                        <h4>#{order._id.slice(-8).toUpperCase()} · {request.type}</h4>
+                        <p>{address.name || order.customer?.name || "Customer"} · {address.phone || order.customer?.phone || "No phone"}</p>
+                      </div>
+                      <time dateTime={request.requestedAt}>{new Date(request.requestedAt).toLocaleString("en-IN")}</time>
+                    </div>
+                    <div className="admin-return-card-content">
+                      <div>
+                        <strong>Items</strong>
+                        <ul>{(order.items || []).map((item, index) => (
+                          <li key={`${item.productId}-${index}`}>{item.title} · Qty {item.quantity}{[item.color, item.size].filter(Boolean).length ? ` · ${[item.color, item.size].filter(Boolean).join(" / ")}` : ""}</li>
+                        ))}</ul>
+                      </div>
+                      <div>
+                        <strong>Customer reason</strong>
+                        <p>{request.reason}</p>
+                        <strong>Order total</strong>
+                        <p>Rs. {Number(order.total || 0).toLocaleString("en-IN")}</p>
+                      </div>
+                    </div>
+                    {request.status === "requested" ? (
+                      <div className="admin-return-review-actions">
+                        <label>Response note (optional)
+                          <textarea maxLength="1000" value={returnReviewNotes[order._id] || ""} onChange={(event) => setReturnReviewNotes((current) => ({ ...current, [order._id]: event.target.value }))} />
+                        </label>
+                        <button type="button" onClick={() => reviewReturnRequest(order, "approved")}>Approve request</button>
+                        <button type="button" className="admin-return-reject" onClick={() => reviewReturnRequest(order, "rejected")}>Reject request</button>
+                      </div>
+                    ) : (
+                      <p className="admin-return-response">
+                        {request.adminNote || "No response note was recorded."}
+                        {request.reviewedAt && <small>Reviewed {new Date(request.reviewedAt).toLocaleString("en-IN")}</small>}
+                      </p>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="admin-returns-empty">
+              <span aria-hidden="true">✓</span>
+              <h4>All caught up</h4>
+              <p>Customer return and exchange requests will appear here.</p>
+            </div>
+          )}
+        </section>
+      </div>
+
       {printOrder && createPortal(
         <article className="order-print-sheet" aria-label="Printable order invoice">
           <header className="order-print-header">
             <div>
-              <p className="order-print-brand">Kashmir Cloth Stores</p>
+              <p className="order-print-brand">RacoonBro</p>
               <p>Order invoice</p>
             </div>
             <div className="order-print-number">
@@ -3831,6 +4095,12 @@ function sendStructuredEmail(order) {
 
           <div className="order-print-totals">
             <div><span>Items subtotal</span><strong>Rs. {printableSubtotal.toLocaleString("en-IN")}</strong></div>
+            {printOrder?.couponDiscount > 0 && (
+              <div><span>Coupon ({printOrder.couponCode})</span><strong>− Rs. {Number(printOrder.couponDiscount).toLocaleString("en-IN")}</strong></div>
+            )}
+            {printableCodFee > 0 && (
+              <div><span>COD cash-handling fee</span><strong>Rs. {printableCodFee.toLocaleString("en-IN")}</strong></div>
+            )}
             {Math.abs(printableAdjustment) > 0.01 && (
               <div>
                 <span>Order adjustment</span>
@@ -3841,7 +4111,7 @@ function sendStructuredEmail(order) {
             )}
             <div className="order-print-grand-total"><span>Order total</span><strong>Rs. {printableTotal.toLocaleString("en-IN")}</strong></div>
           </div>
-          <p className="order-print-footer">Thank you for shopping with Kashmir Cloth Stores.</p>
+          <p className="order-print-footer">Thank you for shopping with RacoonBro.</p>
         </article>,
         document.body
       )}

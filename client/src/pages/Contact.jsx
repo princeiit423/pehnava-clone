@@ -8,9 +8,9 @@ export default function Contact() {
       .then(({ data }) => setContact(data.contact || {}))
       .catch((error) => console.error("Failed to load contact settings:", error));
   }, []);
-  const whatsapp = contact.whatsapp || "7004281547";
-  const email = contact.email || "kashmir.clothstores04@gmail.com";
-  const instagram = contact.instagram || "https://www.instagram.com/kashmirclothstores/";
+  const whatsapp = contact.whatsapp || "";
+  const email = contact.email || "racoonbro777@gmail.com";
+  const instagram = contact.instagram || "";
 
   return (
     <main className="contact-page">
@@ -23,13 +23,7 @@ export default function Contact() {
 
         <div className="contact-cards">
 
-          {/* WhatsApp */}
-          <a
-            href={`https://wa.me/91${whatsapp.replace(/\D/g, "")}`}
-            target="_blank"
-            rel="noreferrer"
-            className="contact-card"
-          >
+          {whatsapp && <div className="contact-card contact-card-static">
             <div className="contact-icon whatsapp-icon">
               <svg viewBox="0 0 24 24" fill="none">
                 <path
@@ -46,9 +40,9 @@ export default function Contact() {
             <div className="contact-card-content">
               <h3>WhatsApp</h3>
               <p>{whatsapp}</p>
-              <span>Chat with us →</span>
+              <span>Message us on WhatsApp →</span>
             </div>
-          </a>
+          </div>}
 
 
           {/* Email */}
@@ -86,12 +80,7 @@ export default function Contact() {
 
 
           {/* Instagram */}
-          <a
-            href={instagram}
-            target="_blank"
-            rel="noreferrer"
-            className="contact-card"
-          >
+          {instagram && <a href={instagram} target="_blank" rel="noreferrer" className="contact-card">
             <div className="contact-icon instagram-icon">
               <svg viewBox="0 0 24 24" fill="none">
                 <rect
@@ -124,7 +113,7 @@ export default function Contact() {
               <p>{instagram.replace(/^https?:\/\/(www\.)?instagram\.com\/?/i, "@").replace(/\/$/, "")}</p>
               <span>Follow us →</span>
             </div>
-          </a>
+          </a>}
 
         </div>
 

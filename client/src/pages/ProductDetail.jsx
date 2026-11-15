@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { api } from "../api.js";
 import { useLikes } from "../context/LikesContext.jsx";
+import { useCart } from "../context/CartContext.jsx";
 import { useRecentlyViewed } from "../context/RecentlyViewedContext.jsx";
 import { useToast } from "../components/Toast.jsx";
 import ProductCard from "../components/ProductCard.jsx";
@@ -10,8 +11,14 @@ import LoadingImage from "../components/LoadingImage.jsx";
 import { LoadingState } from "../components/LoadingState.jsx";
 import { startCheckout } from "../utils/checkout.js";
 import { getRelatedProduct } from "../utils/productRecommendations.js";
+import { getProductGalleryImages } from "../utils/productImages.js";
+import { useProductImpression } from "../hooks/useProductImpression.js";
+import ProductImpressionBadge from "../components/ProductImpressionBadge.jsx";
+import ProductLiveViewerCount from "../components/ProductLiveViewerCount.jsx";
 import { Heart, Share2, Minus, Plus, ChevronRight } from "lucide-react";
+import { ProductPurchaseDetails } from "../components/TrustHighlights.jsx";
 import "./ProductRecommendations.css";
+import "./ProductDetailSpecs.css";
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -34,8 +41,10 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [loadError, setLoadError] = useState("");
   const { isLiked, toggleLike } = useLikes();
+  const { addToCart } = useCart();
   const { addRecent } = useRecentlyViewed();
   const showToast = useToast();
+  const { targetRef: impressionTargetRef, impressionCount } = useProductImpression(product?._id);
 
   function firstAvailableSize(productData, colorName) {
     if (productData.variantStock?.length) {
@@ -154,7 +163,7 @@ export default function ProductDetail() {
   }
 
   const selectedColorImages = product.colors?.find((color) => color.name === selectedColor)?.images?.filter(Boolean) || [];
-  const galleryImages = selectedColorImages.length ? selectedColorImages : product.images || [];
+  const galleryImages = getProductGalleryImages(product, selectedColor);
   const activeImage = galleryImages[activeImg] || product.images?.[0];
   const averageReviewRating = productReviews.length
     ? productReviews.reduce((total, review) => total + review.rating, 0) / productReviews.length
@@ -172,6 +181,24 @@ export default function ProductDetail() {
     });
   }
 
+  function handleAddToCart() {
+    try {
+      addToCart({
+        productId: product._id,
+        title: product.title,
+        slug: product.slug,
+        image: activeImage || "",
+        price: Number(product.salePrice ?? product.price * (1 - (product.discount || 0) / 100)),
+        quantity,
+        size: selectedSize,
+        color: selectedColor,
+      });
+      showToast("Added to cart.");
+    } catch (error) {
+      showToast(error.message || "Unable to add this product to your cart.");
+    }
+  }
+
   function handleShare() {
     const url = window.location.href;
     if (navigator.share) {
@@ -180,6 +207,13 @@ export default function ProductDetail() {
       navigator.clipboard.writeText(url);
       showToast("Product link copied!");
     }
+  }
+
+  function handleLike() {
+    toggleLike(product._id).catch((error) => {
+      console.error("Unable to update wishlist:", error);
+      showToast(error.response?.data?.message || "Unable to update your wishlist.");
+    });
   }
 
   return (
@@ -191,7 +225,8 @@ export default function ProductDetail() {
 
       <div className="pd-layout">
         <div className="pd-gallery">
-          <div className="pd-main-img">
+          <div ref={impressionTargetRef} className="pd-main-img">
+            <ProductImpressionBadge count={impressionCount ?? product.impressionCount} />
             {product.soldOut && <span className="badge sold-out">SOLD OUT</span>}
             <LoadingImage
               key={activeImage}
@@ -220,6 +255,7 @@ export default function ProductDetail() {
 
         <div className="pd-info">
           <h1>{product.title}</h1>
+          <ProductLiveViewerCount productId={product._id} />
           <p className="pd-price">Rs. {(product.salePrice ?? product.price).toLocaleString("en-IN")}.00 {product.discount > 0 && <del>Rs. {product.price.toLocaleString("en-IN")}</del>} {product.discount > 0 && <strong className="discount-badge">{product.discount}% OFF</strong>}</p>
           {!loadingReviews && !reviewLoadError && productReviews.length > 0 && (
             <a className="pd-review-link" href="#product-reviews">
@@ -251,6 +287,9 @@ export default function ProductDetail() {
           <div className="quantity-control"><h4>Quantity</h4><div><button type="button" aria-label="Decrease quantity" onClick={() => setQuantity((value) => Math.max(1, value - 1))}><Minus size={15} /></button><strong>{quantity}</strong><button type="button" aria-label="Increase quantity" disabled={quantity >= availableStock} onClick={() => setQuantity((value) => Math.min(availableStock, value + 1))}><Plus size={15} /></button></div></div>
 
           <div className="pd-actions">
+            <button className="add-to-cart-btn pd-add-to-cart-btn" type="button" onClick={handleAddToCart} disabled={isUnavailable || quantity > availableStock}>
+              ADD TO CART
+            </button>
             <button className="buy-now-btn large" onClick={handleBuyNow} disabled={isUnavailable || quantity > availableStock}>
               <span>{isUnavailable ? "OUT OF STOCK" : "BUY IT NOW"}</span>
               {!isUnavailable && (
@@ -275,7 +314,7 @@ export default function ProductDetail() {
               </div>
             </div>
             <div className="pd-icon-row">
-              <button className={`like-btn ${liked ? "liked" : ""}`} onClick={() => toggleLike(product._id)}>
+              <button className={`like-btn ${liked ? "liked" : ""}`} onClick={handleLike}>
                 <Heart size={16} fill={liked ? "currentColor" : "none"} /> {liked ? "Liked" : "Like"}
               </button>
               <button className="share-btn" onClick={handleShare}>
@@ -283,6 +322,7 @@ export default function ProductDetail() {
               </button>
             </div>
           </div>
+          <ProductPurchaseDetails codEligible={product.codEligible !== false} />
 
           <div className="pd-tabs">
             <div className="pd-tab-heads">
@@ -293,7 +333,24 @@ export default function ProductDetail() {
               ))}
             </div>
             <div className="pd-tab-body">
-              {tab === "description" && <p>{product.description}</p>}
+              {tab === "description" && (
+                <>
+                  {product.description && <p>{product.description}</p>}
+                  <dl className="product-specifications">
+                    {[
+                      ["Garment", product.type],
+                      ["Fit", product.fit],
+                      ["Fabric", product.fabric],
+                      ["Best for", product.occasion],
+                    ].filter(([, value]) => value).map(([label, value]) => (
+                      <div key={label}>
+                        <dt>{label}</dt>
+                        <dd>{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </>
+              )}
               {tab === "care" && <p>{product.careGuide}</p>}
               {tab === "shipping" && <p>{product.shipping}</p>}
             </div>

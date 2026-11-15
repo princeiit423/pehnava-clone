@@ -9,7 +9,6 @@ export default function Search() {
   const q = params.get("q") || "";
 
   const [results, setResults] = useState([]);
-  const [suggested, setSuggested] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -22,13 +21,12 @@ export default function Search() {
       setLoading(true);
       setError("");
       setResults([]);
-      setSuggested([]);
 
       try {
         if (!query) {
-          const response = await api.get("/products");
-          const allProducts = Array.isArray(response.data) ? response.data : [];
-          if (!cancelled) setResults(allProducts.slice(0, 12));
+          const response = await api.get("/products", { params: { limit: 12 } });
+          const initialProducts = Array.isArray(response.data?.products) ? response.data.products : [];
+          if (!cancelled) setResults(initialProducts);
           return;
         }
 
@@ -47,23 +45,11 @@ export default function Search() {
           setResults(searchResults);
           return;
         }
-
-        // No exact matches:
-        // fetch the normal product list so the page never looks empty.
-        const fallbackResponse = await api.get("/products");
-        const allProducts = Array.isArray(fallbackResponse.data)
-          ? fallbackResponse.data
-          : [];
-
-        if (!cancelled) {
-          setSuggested(allProducts.slice(0, 8));
-        }
       } catch (err) {
         console.error("Search failed:", err);
 
         if (!cancelled) {
           setResults([]);
-          setSuggested([]);
           setError("Unable to load search results.");
         }
       } finally {
@@ -99,28 +85,13 @@ export default function Search() {
             <ProductCard key={p._id} product={p} />
           ))}
         </div>
-      ) : suggested.length > 0 ? (
-        <>
-          <div className="search-no-match">
-            <p>
-              No exact matches for <strong>"{q}"</strong>.
-            </p>
-            <span>You may like these:</span>
-          </div>
-
-          <div className="product-row grid4">
-            {suggested.map((p) => (
-              <ProductCard key={p._id} product={p} />
-            ))}
-          </div>
-        </>
       ) : (
         <div className="search-empty">
-          <p>{q.trim() ? "Try browsing a collection while we help you find the right product." : "Browse our collections to find your next look."}</p>
+          <p>{q.trim() ? `No matching or similar products found for "${q}". Try another search or browse a collection.` : "Browse our collections to find your next look."}</p>
           <nav className="search-collection-links" aria-label="Browse collections">
-            <Link to="/collections/trending">New Drop</Link>
-            <Link to="/collections/stitched-wear">Ready To Wear</Link>
-            <Link to="/collections/unstitched">Unstitched</Link>
+            <Link to="/collections/trending">New Arrivals</Link>
+            <Link to="/collections/stitched-wear">Tees & Polos</Link>
+            <Link to="/collections/daily-wear">Everyday Shirts</Link>
             <Link to="/">Home</Link>
           </nav>
         </div>

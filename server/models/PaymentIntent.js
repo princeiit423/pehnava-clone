@@ -26,6 +26,9 @@ const paymentIntentSchema = new mongoose.Schema({
   customer: { type: mongoose.Schema.Types.ObjectId, ref: "Customer", required: true, index: true },
   items: { type: [itemSchema], required: true },
   total: { type: Number, required: true, min: 0 },
+  itemSubtotal: { type: Number, min: 0 },
+  couponCode: { type: String, trim: true, uppercase: true, maxlength: 32, default: "" },
+  couponDiscount: { type: Number, min: 0, default: 0 },
   amountPaise: { type: Number, required: true, min: 1 },
   shippingAddress: {
     name: { type: String, required: true },

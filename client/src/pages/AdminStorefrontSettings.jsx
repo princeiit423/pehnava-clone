@@ -4,6 +4,7 @@ import { api, setAdminToken } from "../api.js";
 
 const SECTIONS = [
   ["categories", "Categories"],
+  ["impressions", "Product impressions"],
   ["homepage", "Homepage categories"],
   ["home-carousels", "Homepage carousels"],
   ["announcements", "Announcements"],
@@ -13,6 +14,7 @@ const SECTIONS = [
   ["footer", "Footer"],
 ];
 const EMPTY_SETTINGS = {
+  impressionTrackingEnabled: false,
   categories: [], homeCarousels: [], announcements: [], locations: [], showroom: {}, shopColors: {}, contact: {},
   story: [], storyTitle: "", footer: { links: [] },
 };
@@ -34,6 +36,8 @@ export default function AdminStorefrontSettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [impressionStats, setImpressionStats] = useState([]);
+  const [impressionsLoading, setImpressionsLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -46,6 +50,25 @@ export default function AdminStorefrontSettings() {
       .catch((err) => setError(err.response?.data?.message || "Unable to load storefront settings."))
       .finally(() => setLoading(false));
   }, [navigate]);
+
+  useEffect(() => {
+    if (activeSection !== "impressions") return;
+    let cancelled = false;
+    setImpressionsLoading(true);
+    api.get("/products/admin/impressions")
+      .then(({ data }) => {
+        if (!cancelled) setImpressionStats(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.response?.data?.message || "Unable to load product impressions.");
+      })
+      .finally(() => {
+        if (!cancelled) setImpressionsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection]);
 
   function update(field, value) {
     setSettings((current) => ({ ...current, [field]: value }));
@@ -139,6 +162,32 @@ export default function AdminStorefrontSettings() {
                 ))}
               </div>
               <button type="button" onClick={() => update("categories", [...categories, { slug: "", label: "", productTag: "", active: true, type: "tag", showOnHomepage: false, homepageOrder: categories.length, imageUrl: "" }])}>Add category</button>
+            </section>
+          )}
+          {activeSection === "impressions" && (
+            <section className="homepage-admin-section">
+              <h2>Product impression tracking</h2>
+              <p>Count each product once when its image is at least half visible in the storefront or product details. Turning tracking off pauses new counts without deleting existing totals.</p>
+              <label className="store-settings-checkbox">
+                <input
+                  type="checkbox"
+                  checked={settings.impressionTrackingEnabled === true}
+                  onChange={(event) => update("impressionTrackingEnabled", event.target.checked)}
+                />
+                Enable product impression tracking
+              </label>
+              <h2>Product impressions</h2>
+              {impressionsLoading ? <p>Loading product impressions…</p> : (
+                <div className="store-settings-list">
+                  {impressionStats.map((product) => (
+                    <article className="homepage-admin-card store-settings-row-head" key={product._id}>
+                      <Link to={`/products/${product.slug}`} target="_blank" rel="noreferrer">{product.title}</Link>
+                      <strong>{Number(product.impressionCount || 0).toLocaleString("en-IN")}</strong>
+                    </article>
+                  ))}
+                  {!impressionStats.length && <p>No products found.</p>}
+                </div>
+              )}
             </section>
           )}
           {activeSection === "homepage" && (
@@ -252,6 +301,7 @@ export default function AdminStorefrontSettings() {
           )}
           {activeSection === "contact" && (
             <section className="homepage-admin-section">
+              <p className="customer-data-warning">Leave WhatsApp blank until an official support number is confirmed.</p>
               <div className="homepage-admin-grid">
                 {["heading", "intro", "helpHeading", "helpText", "whatsapp", "email", "instagram"].map((field) => <Field key={field} label={field[0].toUpperCase() + field.slice(1)} multiline={["intro", "helpText"].includes(field)} rows="3" value={settings.contact?.[field]} onChange={(value) => update("contact", { ...settings.contact, [field]: value })} type={field === "instagram" ? "url" : "text"} />)}
               </div>

@@ -13,6 +13,8 @@ import HomepageContent from "../models/HomepageContent.js";
 import Review from "../models/Review.js";
 import { buildOrderEmailHtml } from "../services/orderEmail.js";
 import { isValidCustomerEmail, isValidIndianPhone, normalizeCustomerEmail, normalizeIndianPhone } from "../utils/customerValidation.js";
+import { restoreOrderStock } from "../utils/orderInventory.js";
+import { adminLoginRateLimiter } from "../middleware/rateLimit.js";
 
 const router = express.Router();
 const ORDER_STATUSES = [
@@ -24,81 +26,6 @@ const ORDER_STATUSES = [
   "delivered",
   "cancelled_refund",
 ];
-
-async function restoreOrderStock(order, { skipUnavailable = false } = {}) {
-  if (order.stockRestoredAt) return [];
-  const unavailableItems = [];
-  for (const item of order.items || []) {
-    if (!item.productId || item.productId === "offline") continue;
-    if (!mongoose.isValidObjectId(item.productId)) {
-      if (skipUnavailable) {
-        unavailableItems.push(item.title || "A product with an invalid inventory reference");
-        continue;
-      }
-      throw new Error(`Unable to restore stock because product ${item.productId} has an invalid ID.`);
-    }
-    if (!Number.isFinite(Number(item.quantity)) || Number(item.quantity) <= 0) {
-      if (skipUnavailable) {
-        unavailableItems.push(item.title || "A product with an invalid quantity");
-        continue;
-      }
-      throw new Error(`Unable to restore stock because ${item.title || "an order item"} has an invalid quantity.`);
-    }
-    const product = await Product.findById(item.productId).select("variantStock colors");
-    if (!product) {
-      if (skipUnavailable) {
-        unavailableItems.push(item.title || "An unavailable product");
-        continue;
-      }
-      throw new Error(`Unable to restore stock because product ${item.productId} no longer exists.`);
-    }
-    const variant = product.variantStock?.find(
-      (entry) => String(entry.size || "").trim() === String(item.size || "").trim()
-        && String(entry.color || "").trim() === String(item.color || "").trim()
-    );
-    if (product.variantStock?.length && !variant) {
-      if (skipUnavailable) {
-        unavailableItems.push(item.title || "A product with an unavailable variant");
-        continue;
-      }
-      throw new Error(`Unable to locate the ordered inventory variant for ${item.title}.`);
-    }
-    const color = product.colors?.find((entry) => entry.name === item.color);
-    const hasColorStock = color?.stock !== undefined && color?.stock !== null;
-    const filter = { _id: product._id };
-    const increment = { stock: item.quantity };
-    const options = {};
-
-    if (variant) {
-      filter.variantStock = { $elemMatch: { size: item.size, color: item.color } };
-      increment["variantStock.$.stock"] = item.quantity;
-      if (hasColorStock) {
-        filter.colors = { $elemMatch: { name: item.color } };
-        increment["colors.$[color].stock"] = item.quantity;
-        options.arrayFilters = [{ "color.name": item.color }];
-      }
-    } else if (hasColorStock) {
-      filter.colors = { $elemMatch: { name: item.color } };
-      increment["colors.$.stock"] = item.quantity;
-    }
-
-    const result = await Product.updateOne(
-      filter,
-      { $inc: increment, $set: { soldOut: false } },
-      options
-    );
-    if (!result.modifiedCount) {
-      if (skipUnavailable) {
-        unavailableItems.push(item.title || "A product with unavailable inventory");
-        continue;
-      }
-      throw new Error(`Unable to restore stock for product ${item.productId}.`);
-    }
-  }
-  order.stockRestoredAt = new Date();
-  await order.save();
-  return unavailableItems;
-}
 
 async function rollbackManualOrderStock(adjustment) {
   const increment = {
@@ -369,7 +296,7 @@ router.put("/homepage-content", requireAdmin, async (req, res) => {
 // ADMIN LOGIN
 // ============================================================
 
-router.post("/login", (req, res) => {
+router.post("/login", adminLoginRateLimiter, (req, res) => {
   const { password } = req.body;
 
   if (
@@ -637,17 +564,55 @@ router.patch(
 
       const existingOrder = await Order.findById(req.params.id);
       if (!existingOrder) return res.status(404).json({ message: "Order not found" });
+      if (
+        ["cancelled", "cancelled_refund"].includes(existingOrder.status)
+        && update.status
+        && !["cancelled", "cancelled_refund"].includes(update.status)
+      ) {
+        return res.status(409).json({ message: "A cancelled order cannot be moved back to an active status." });
+      }
+      if (update.status === "delivered" && !existingOrder.deliveredAt) {
+        update.deliveredAt = new Date();
+      }
       if (update.shippingAddress) {
         update.editedAt = new Date();
         update.editedBy = "admin";
       }
 
+      let order;
       if (update.status === "cancelled_refund" && existingOrder.status !== "cancelled_refund") {
-        await restoreOrderStock(existingOrder);
-        update.stockRestoredAt = existingOrder.stockRestoredAt;
+        order = await Order.findOneAndUpdate(
+          { _id: req.params.id, status: existingOrder.status },
+          { $set: update },
+          { new: true, runValidators: true }
+        );
+        if (!order) {
+          return res.status(409).json({ message: "This order changed while you were updating it. Refresh and try again." });
+        }
+        try {
+          await restoreOrderStock(order);
+        } catch (error) {
+          console.error("Admin order stock restoration error:", error);
+          const rollback = await Order.updateOne(
+            { _id: order._id, status: "cancelled_refund", stockRestoredAt: null },
+            { $set: { status: existingOrder.status } }
+          );
+          if (!rollback.modifiedCount) {
+            return res.status(500).json({ message: "Order cancellation could not complete safely. Please verify inventory before retrying." });
+          }
+          return res.status(500).json({ message: "Stock could not be restored, so the cancellation was rolled back." });
+        }
+      } else {
+        order = await Order.findOneAndUpdate(
+          { _id: req.params.id, status: existingOrder.status },
+          { $set: update },
+          { new: true, runValidators: true }
+        );
+        if (!order) {
+          return res.status(409).json({ message: "This order changed while you were updating it. Refresh and try again." });
+        }
       }
-      const order = await Order.findByIdAndUpdate(req.params.id, { $set: update }, { new: true, runValidators: true })
-        .populate("customer", "name phone email");
+      await order.populate("customer", "name phone email");
 
       // Send notification when status
       // or tracking information changes.
@@ -669,12 +634,39 @@ router.patch(
         error
       );
 
-      res.status(500).json({
+      res.status(error.status || 500).json({
         message: error.message || "Failed to update order",
       });
     }
   }
 );
+
+router.patch("/orders/:id/return-request", requireAdmin, async (req, res) => {
+  try {
+    const status = String(req.body?.status || "");
+    const adminNote = String(req.body?.adminNote || "").trim();
+    if (!["approved", "rejected"].includes(status) || adminNote.length > 1000) {
+      return res.status(400).json({ message: "Choose approve or reject and enter a note no longer than 1000 characters." });
+    }
+
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (!order.returnRequest || order.returnRequest.status !== "requested") {
+      return res.status(409).json({ message: "There is no pending return or exchange request for this order." });
+    }
+    order.returnRequest.status = status;
+    order.returnRequest.reviewedAt = new Date();
+    order.returnRequest.reviewedBy = req.user?.sub || "admin";
+    order.returnRequest.adminNote = adminNote;
+    await order.save();
+    await order.populate("customer", "name phone email");
+    await notifyOrder(order, "return_request_reviewed");
+    res.json(order);
+  } catch (error) {
+    console.error("Review return request error:", error);
+    res.status(500).json({ message: "Failed to update return or exchange request" });
+  }
+});
 
 
 // ============================================================
@@ -686,20 +678,10 @@ router.delete(
   requireAdmin,
   async (req, res) => {
     try {
-      const order =
-        await Order.findById(
-          req.params.id
-        );
-
-      if (!order) {
-        return res.status(404).json({
-          message:
-            "Order not found",
-        });
-      }
+      const order = await Order.findById(req.params.id);
+      if (!order) return res.status(404).json({ message: "Order not found" });
 
       const unavailableItems = await restoreOrderStock(order, { skipUnavailable: true });
-
       await order.deleteOne();
 
       res.json({
@@ -716,7 +698,7 @@ router.delete(
         error
       );
 
-      res.status(500).json({
+      res.status(error.status || 500).json({
         message: error.message || "Failed to delete order",
       });
     }
@@ -799,12 +781,12 @@ router.post(
             body: JSON.stringify({
               from:
                 process.env.MAIL_FROM ||
-                "orders@kashmirclothstores.example",
+                "RacoonBro <racoonbro777@gmail.com>",
 
               to: [email],
 
               subject:
-                `Kashmir Cloth Stores order #${orderId} update`,
+                `RacoonBro order #${orderId} update`,
 
               html,
             }),

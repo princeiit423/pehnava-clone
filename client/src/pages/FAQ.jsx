@@ -2,6 +2,19 @@ import React, { useState } from "react";
 
 const faqs = [
   {
+    question: "Can I pay cash on delivery or return an item?",
+    answer: (
+      <>
+        Cash on delivery is available only for products marked eligible at checkout.
+        A cash-handling charge applies; choose online payment to avoid it.
+        <br /><br />
+        All products may be requested for return or exchange within 7 days after
+        delivery. Sign in to your account to submit a request. Our team reviews each
+        request before confirming next steps.
+      </>
+    ),
+  },
+  {
     question: "Where do you ship from?",
     answer: "We are shipping from Bokaro Jharkhand.",
   },

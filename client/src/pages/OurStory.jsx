@@ -11,11 +11,9 @@ export default function OurStory() {
     }).catch((error) => console.error("Failed to load Our Story settings:", error));
   }, []);
   const defaultStory = [
-    "Started Business in 1960s and Founded Kashmir Cloth Stores in 1980s, was born out of a desire to share the rich cultural heritage of Indian clothing with men and women across India and around the world.",
-    "What started as a small store has quickly grown into a trusted brand known for its high-quality products and exceptional customer service.",
-    "Our curated collection includes Saree, Ladies Suits, Lehenga, Shirting, Suiting, Coat-Pant, Kurta, Shawl, Blanket, Curtains, Towel. We deliver party wear and daily wear catering to a variety of styles and preferences.",
-    "We believe in the power of fashion to transform and uplift, and we are dedicated to providing our customers with the best in Indian fashion.",
-    "Founder: Late Janab Akhtar Hussain",
+    "RacoonBro is built around the pieces you reach for every day: comfortable tees, easy shirts, dependable bottoms and layers that work on repeat.",
+    "We focus on wearable fits, versatile colors and straightforward essentials that make getting dressed easy.",
+    "Made for the daily rotation — from workdays to weekends and everything in between.",
   ];
   const paragraphs = story === null ? defaultStory : story;
 
@@ -26,8 +24,11 @@ export default function OurStory() {
         <section className="story-text">
           <h1>{storyTitle}</h1>
 
-          {paragraphs.slice(0, -1).map((paragraph, index) => <p key={index}>{paragraph}</p>)}
-          {paragraphs.length > 0 && <p className="founder">{paragraphs[paragraphs.length - 1]?.startsWith("Founder:") ? <>Founder: <strong>{paragraphs[paragraphs.length - 1].replace(/^Founder:\s*/, "")}</strong></> : paragraphs[paragraphs.length - 1]}</p>}
+          {paragraphs.map((paragraph, index) => (
+            paragraph.startsWith("Founder:")
+              ? <p className="founder" key={index}>Founder: <strong>{paragraph.replace(/^Founder:\s*/, "")}</strong></p>
+              : <p key={index}>{paragraph}</p>
+          ))}
         </section>
 
       </div>

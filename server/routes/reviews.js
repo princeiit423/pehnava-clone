@@ -8,6 +8,7 @@ import Review from "../models/Review.js";
 import { requireAdmin, requireCustomer } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/razorpay.js";
 import { deleteReviewImages, IMAGE_TYPES, MAX_IMAGE_SIZE, uploadReviewImage } from "../services/reviewImages.js";
+import { reviewUploadRateLimiter } from "../middleware/rateLimit.js";
 
 const router = express.Router();
 const imageUpload = multer({
@@ -112,7 +113,7 @@ router.get("/admin", requireAdmin, asyncHandler(async (req, res) => {
   res.json(reviews);
 }));
 
-router.post("/orders/:orderId", requireCustomer, parseReviewImages, asyncHandler(async (req, res) => {
+router.post("/orders/:orderId", requireCustomer, reviewUploadRateLimiter, parseReviewImages, asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.orderId) || !mongoose.isValidObjectId(req.body.productId)) {
     return res.status(400).json({ message: "The order or product is invalid." });
   }
@@ -160,7 +161,7 @@ router.post("/orders/:orderId", requireCustomer, parseReviewImages, asyncHandler
   }
 }));
 
-router.patch("/:id", requireCustomer, parseReviewImages, asyncHandler(async (req, res) => {
+router.patch("/:id", requireCustomer, reviewUploadRateLimiter, parseReviewImages, asyncHandler(async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "The review is invalid." });
   const review = await Review.findOne({ _id: req.params.id, customer: req.user.sub });
   if (!review) return res.status(404).json({ message: "Review not found." });

@@ -1,7 +1,20 @@
 import express from "express";
 import mongoose from "mongoose";
 import Product from "../models/Product.js";
+import ProductViewerPresence from "../models/ProductViewerPresence.js";
+import StorefrontSettings from "../models/StorefrontSettings.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { buildProductSearchQuery, rankProductsBySearch } from "../utils/productSearch.js";
+import {
+  getProductViewerExpiry,
+  hashProductViewerId,
+  normalizeProductViewerId,
+} from "../utils/productViewers.js";
+import {
+  decodeProductCursor,
+  encodeProductCursor,
+  parseProductPageSize,
+} from "../utils/productPagination.js";
 
 const router = express.Router();
 
@@ -44,16 +57,28 @@ function availableStock(product) {
   return Math.max(0, Number(product.stock) || 0);
 }
 
-function toProductResponse(product) {
-  const item = product.toObject();
+export function toProductResponse(product, includeImpressionCount = false) {
+  const item = typeof product.toObject === "function" ? product.toObject() : { ...product };
+  if (!includeImpressionCount) delete item.impressionCount;
   item.stock = availableStock(item);
   item.soldOut = item.stock <= 0;
   item.salePrice = item.price * (1 - Math.min(99, item.discount || 0) / 100);
   return item;
 }
 
+async function impressionTrackingEnabled() {
+  const settings = await StorefrontSettings.findOne({ key: "storefront" })
+    .select("impressionTrackingEnabled")
+    .lean();
+  return settings?.impressionTrackingEnabled === true;
+}
+
 export function normalizeProductPayload(payload) {
   const body = { ...payload };
+  delete body.impressionCount;
+  if (body.codEligible !== undefined && typeof body.codEligible !== "boolean") {
+    throw new Error("COD eligibility must be enabled or disabled");
+  }
   if (Array.isArray(body.variantStock) && body.variantStock.length) {
     body.variantStock = normalizeVariantInventory(body.variantStock);
     body.sizes = [...new Set(body.variantStock.map((variant) => variant.size))];
@@ -110,6 +135,24 @@ router.get("/", async (req, res) => {
   try {
     const { category, minPrice, maxPrice, color, dupatta, search, ids } =
       req.query;
+    const isPaginated = req.query.limit !== undefined;
+    if (!isPaginated && req.query.cursor !== undefined) {
+      return res.status(400).json({ message: "A product cursor requires a page limit" });
+    }
+    let pageSize;
+    let cursor;
+    if (isPaginated) {
+      try {
+        pageSize = parseProductPageSize(req.query.limit);
+        cursor = req.query.cursor === undefined ? null : decodeProductCursor(req.query.cursor);
+      } catch (error) {
+        return res.status(400).json({ message: error.message });
+      }
+      if (search !== undefined) {
+        return res.status(400).json({ message: "Product search does not support cursor pagination" });
+      }
+    }
+
     const q = {};
     if (category) q.categories = category;
     if (color) q["colors.name"] = color;
@@ -119,13 +162,81 @@ router.get("/", async (req, res) => {
       if (minPrice) q.price.$gte = Number(minPrice);
       if (maxPrice) q.price.$lte = Number(maxPrice);
     }
-    if (search) q.$text = { $search: search };
     if (ids) q._id = { $in: ids.split(",") };
 
-    const products = (await Product.find(q).sort({ createdAt: -1 })).map(toProductResponse);
-    res.json(products);
+    let foundProducts;
+    if (search !== undefined) {
+      const searchText = typeof search === "string" ? search.trim() : "";
+      if (searchText.length > 100) {
+        return res.status(400).json({ message: "Search must be 100 characters or fewer" });
+      }
+      const searchQuery = buildProductSearchQuery(searchText);
+      if (!searchQuery) return res.json([]);
+
+      foundProducts = await Product.find({ ...q, ...searchQuery });
+      if (!foundProducts.length) {
+        foundProducts = rankProductsBySearch(await Product.find(q), searchText);
+      } else {
+        foundProducts = rankProductsBySearch(foundProducts, searchText);
+      }
+    } else {
+      if (isPaginated) {
+        const pageQuery = cursor
+          ? { $and: [q, {
+            $or: [
+              { createdAt: { $lt: cursor.createdAt } },
+              { createdAt: cursor.createdAt, _id: { $lt: new mongoose.Types.ObjectId(cursor.id) } },
+            ],
+          }] }
+          : q;
+        const listingFields = [
+          "title", "slug", "sku", "price", "discount", "impressionCount", "stock",
+          "images", "type", "fabric", "fit", "occasion", "dupatta",
+          "colors.name", "colors.hex", "colors.stock", "colors.images", "sizes", "variantStock",
+          "categories", "codEligible", "soldOut", "isNew", "createdAt",
+        ].join(" ");
+        foundProducts = await Product.find(pageQuery)
+          .select(listingFields)
+          .sort({ createdAt: -1, _id: -1 })
+          .limit(pageSize + 1)
+          .lean();
+      } else {
+        foundProducts = await Product.find(q).sort({ createdAt: -1 });
+      }
+    }
+
+    const showImpressions = await impressionTrackingEnabled();
+    if (isPaginated) {
+      const hasMore = foundProducts.length > pageSize;
+      const page = foundProducts.slice(0, pageSize);
+      res.json({
+        products: page.map((product) => toProductResponse(product, showImpressions)),
+        nextCursor: hasMore ? encodeProductCursor(page[page.length - 1]) : null,
+      });
+      return;
+    }
+    res.json(foundProducts.map((product) => toProductResponse(product, showImpressions)));
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/products/admin/impressions (admin)
+router.get("/admin/impressions", requireAdmin, async (req, res) => {
+  try {
+    const products = await Product.find({})
+      .select("title slug impressionCount")
+      .sort({ impressionCount: -1, title: 1 })
+      .lean();
+    res.json(products.map((product) => ({
+      _id: product._id,
+      title: product.title,
+      slug: product.slug,
+      impressionCount: product.impressionCount || 0,
+    })));
+  } catch (error) {
+    console.error("Get product impressions error:", error);
+    res.status(500).json({ message: "Failed to load product impressions." });
   }
 });
 
@@ -137,9 +248,89 @@ router.get("/:slug", async (req, res) => {
       product = await Product.findById(req.params.slug);
     }
     if (!product) return res.status(404).json({ message: "Not found" });
-    res.json(toProductResponse(product));
+    res.json(toProductResponse(product, await impressionTrackingEnabled()));
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /api/products/:id/impression
+router.post("/:id/impression", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ message: "Invalid product ID" });
+  }
+
+  try {
+    if (!await impressionTrackingEnabled()) return res.sendStatus(204);
+
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { impressionCount: 1 } },
+      { new: true }
+    ).select("_id impressionCount");
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json({ impressionCount: product.impressionCount || 0 });
+  } catch (error) {
+    console.error("Record product impression error:", error);
+    res.status(500).json({ message: "Failed to record product impression." });
+  }
+});
+
+// POST /api/products/:id/viewers/heartbeat
+router.post("/:id/viewers/heartbeat", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ message: "Invalid product ID" });
+  }
+
+  try {
+    const viewerId = normalizeProductViewerId(req.body?.viewerId);
+    const now = new Date();
+    const expiresAt = getProductViewerExpiry(now.getTime());
+    const productId = new mongoose.Types.ObjectId(req.params.id);
+    const viewerHash = hashProductViewerId(viewerId);
+    const productExists = await Product.exists({ _id: productId });
+    if (!productExists) return res.status(404).json({ message: "Product not found" });
+
+    await ProductViewerPresence.findOneAndUpdate(
+      { productId, viewerHash },
+      {
+        $set: { lastSeenAt: now, expiresAt },
+        $setOnInsert: { productId, viewerHash },
+      },
+      { upsert: true, new: true, runValidators: true }
+    );
+    const activeViewers = await ProductViewerPresence.countDocuments({
+      productId,
+      expiresAt: { $gt: now },
+    });
+    res.json({ activeViewers });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ message: error.message });
+    console.error("Update product viewer presence error:", error);
+    res.status(500).json({ message: "Unable to update live product viewers." });
+  }
+});
+
+// PATCH /api/products/:id/cod-eligibility (admin)
+router.patch("/:id/cod-eligibility", requireAdmin, async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    return res.status(400).json({ message: "Invalid product ID" });
+  }
+  const { codEligible } = req.body || {};
+  if (typeof codEligible !== "boolean") {
+    return res.status(400).json({ message: "COD eligibility must be enabled or disabled" });
+  }
+
+  try {
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { $set: { codEligible } },
+      { new: true, runValidators: true }
+    );
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    res.json(toProductResponse(product));
+  } catch (err) {
+    res.status(400).json({ message: err.message || "Unable to update COD eligibility" });
   }
 });
 

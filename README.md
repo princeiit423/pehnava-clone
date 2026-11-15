@@ -1,12 +1,12 @@
-# E-Commerce Website — React (MERN)
+# RacoonBro — Wear the Attitude
 
-Full responsive React e-commerce app for Kashmir Cloth Stores, with a MongoDB-Atlas-backed
+Full responsive React e-commerce app for RacoonBro clothing, with a MongoDB-Atlas-backed
 admin panel for CRUD, likes/wishlist, recently viewed, category filters, search,
 share, Razorpay checkout, and customer order tracking.
 
 ## Folder structure
 ```
-kashmir-cloth-stores/
+racoonbro/
   server/   -> Express + Mongoose API (connects to MongoDB Atlas)
   client/   -> React + Vite frontend
 ```
@@ -28,6 +28,8 @@ Edit `.env`:
 - `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` —
   backend-only Cloudinary credentials used for customer review photos. Never
   add the Cloudinary secret to a `VITE_` variable or commit it to source control.
+- `CLIENT_ORIGIN` — comma-separated production frontend origin(s); configure the
+  RacoonBro site origin so CORS and order-email links use the deployed storefront.
 
 Seed 10 starter products (safe to re-run, it replaces existing products):
 ```bash
@@ -40,6 +42,25 @@ npm run dev
 ```
 API runs on `http://localhost:5000/api`.
 
+The API limits requests to 600 per IP per 15 minutes, with stricter limits for
+customer sign-in/registration (10), admin login (5), checkout (20), and review
+submissions (5). A limit response uses HTTP 429 and includes retry/rate-limit
+headers. Limits are counted per running server process; use a shared rate-limit
+store before running multiple API instances if you need a single limit across
+the whole deployment.
+
+The default `TRUST_PROXY_HOPS=0` does not trust forwarded IP headers. If the API
+is behind a trusted reverse proxy, set this to the exact number of proxy hops
+between the client and the API (commonly `1` for one proxy). Only do this when
+the proxy overwrites forwarded-IP headers; an incorrect value can let clients
+spoof their IP and bypass rate limits.
+
+Public product listings can be fetched in cursor-paginated batches with
+`GET /api/products?limit=24`. The response contains `products` and `nextCursor`;
+send the returned cursor with the next request to continue. Page sizes are capped
+at 50. Paginated listings return only fields needed for product cards, while
+existing requests without `limit` retain the full product response.
+
 ## 2. Frontend setup
 ```bash
 cd client
@@ -47,7 +68,7 @@ npm install
 cp .env.example .env
 ```
 Edit `.env`:
-- `VITE_API_URL` — e.g. `http://localhost:5000/api`
+- `VITE_API_URL` — e.g. `http://localhost:5000/api`; set this to the deployed RacoonBro API URL in production.
 - `VITE_API_URL` must point to the backend that has the Razorpay key pair
   configured. Razorpay credentials belong only on the backend; never add the
   secret key to a `VITE_` variable.
@@ -61,7 +82,7 @@ Opens on `http://localhost:5173`.
 ## 3. Admin Panel
 Go to `/admin`, log in with `ADMIN_PASSWORD`. From `/admin/dashboard` you can
 add/edit/delete products — set price, images (paste your own photo URLs),
-sizes, colors (name:hex), fabric/dupatta, and tick every category the product
+sizes, colors (name:hex), fabric details, and tick every category the product
 should appear under (a product can be in New Drop **and** Daily Wear **and**
 Party Wear at once, etc.) — Budget categories (Under ₹1,699 etc.) are computed
 automatically from price, so you don't pick those.
@@ -80,9 +101,8 @@ mobile hero images, per-category image URLs, and multiple showroom image URLs
 hero and showroom images. Admin Products, Orders, and Customers are available
 as separate dashboard pages.
 
-The homepage showroom section uses the store photo at
-`client/public/showroom/kashmir-storefront.png`, the provided Google Maps
-location link, and the published opening hours and phone number.
+The homepage showroom section uses the current RacoonBro storefront imagery,
+configured Google Maps location link, opening hours, and contact number.
 
 Use **Storefront settings** in the admin panel to edit and add categories,
 choose homepage category visibility/order, update announcement messages, manage
@@ -91,6 +111,14 @@ Contact Us, Our Story, and footer content. Product categories use the matching
 product tag configured on each category. Collection pages also support sorting
 by price and product name; custom color names and shades can be added from the
 product editor.
+
+Use **Product impressions** under Storefront settings to turn product exposure
+tracking on or off and review per-product totals. A product is counted when its
+image is at least half visible in a product card or on its detail page.
+Lifetime impression totals remain stored with each product while tracking is
+enabled. Product detail pages also show a live count of active browser sessions;
+the count refreshes periodically and a session expires automatically after it
+stops sending heartbeats.
 
 Use the separate **Homepage carousels** page under Storefront settings to edit
 carousel titles, add or remove sections, control visibility and display order,
@@ -105,6 +133,12 @@ does not issue a payment-provider refund, which must be processed manually.
 Order delivery details can be edited, and edits are marked in the customer's
 order history. Deleting an order is separate from deleting a customer.
 
+Use **Coupons** in the admin dashboard to generate or enter coupon codes,
+configure percentage or fixed discounts, optional minimum order and maximum
+discount amounts, validity dates, and active status. Customers can apply one
+coupon during checkout; the server recalculates the discount from current
+catalog prices for both online and cash-on-delivery orders.
+
 Customers can sign in with their email address or phone number at `/account`
 to follow order status and review each product in a delivered order. Product
 reviews appear publicly on that product's detail page. A customer can edit or
@@ -112,6 +146,17 @@ delete their own review; admins can delete any review from the admin Orders
 page. A review may include up to three JPEG, PNG, or WebP images, each no
 larger than 5 MB; images are uploaded to Cloudinary by the backend. Deleting a
 customer removes their profile and anonymizes their retained product reviews.
+
+Signed-in customer wishlists sync to the customer account across devices;
+guest wishlists remain stored in the current browser and merge into the account
+after sign-in. Checkout saves a validated shipping address to the customer
+profile and pre-fills it on future visits.
+
+Customers can add product options to a persistent browser cart, update
+quantities, remove items, and check out multiple products together. The
+storefront refreshes current catalog pricing and availability before checkout;
+the server revalidates stock and calculates prices, coupons, and order totals
+when placing an order.
 
 Product detail pages show one in-stock recommendation, prioritizing shared
 product categories, then garment type and fabric. Unrelated or sold-out
@@ -164,7 +209,7 @@ empty — add your real ones (with real photos) from the admin panel any time.
   reference site: announcement bar, sticky header + search, hero, "Our
   Category" strip, product grid, category/collection pages with a sidebar
   (categories, price range, color palette with name-only-on-hover tooltip,
-  dupatta filter), product detail page (gallery, tabs, size/color, recently
+  apparel filters), product detail page (gallery, tabs, size/color, recently
   viewed).
 - Hover effects: product title underlines, product photo shows size/type
   badge overlay, Buy-It-Now turns black on hover, category tiles lift + zoom,

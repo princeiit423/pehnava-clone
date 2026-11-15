@@ -1,15 +1,21 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLikes } from "../context/LikesContext.jsx";
+import { useCart } from "../context/CartContext.jsx";
 import { useToast } from "./Toast.jsx";
 import { startCheckout } from "../utils/checkout.js";
+import { useProductImpression } from "../hooks/useProductImpression.js";
+import ProductImpressionBadge from "./ProductImpressionBadge.jsx";
 import LoadingImage from "./LoadingImage.jsx";
 import { Heart, Share2 } from "lucide-react";
 
 export default function ProductCard({ product, showBuyNow = true }) {
   const { isLiked, toggleLike } = useLikes();
+  const { addToCart } = useCart();
   const showToast = useToast();
   const navigate = useNavigate();
+  const { targetRef: impressionTargetRef, impressionCount } = useProductImpression(product._id);
+  const displayedImpressionCount = impressionCount ?? product.impressionCount;
   const liked = isLiked(product._id);
 
   function handleShare(e) {
@@ -39,16 +45,41 @@ export default function ProductCard({ product, showBuyNow = true }) {
   });
 }
 
+  function handleAddToCart() {
+    const variant = product.variantStock?.find((entry) => entry.stock > 0);
+    const color = variant?.color || product.colors?.find((entry) => entry.stock > 0)?.name || "";
+    const size = variant?.size || product.sizes?.[0] || "";
+    try {
+      addToCart({
+        productId: product._id,
+        title: product.title,
+        slug: product.slug,
+        image: product.images?.[0] || "",
+        price: Number(product.salePrice ?? product.price * (1 - (product.discount || 0) / 100)),
+        quantity: 1,
+        size,
+        color,
+      });
+      showToast("Added to cart.");
+    } catch (error) {
+      showToast(error.message || "Unable to add this product to your cart.");
+    }
+  }
+
   function handleLike(e) {
     e.preventDefault();
-    toggleLike(product._id);
+    toggleLike(product._id).catch((error) => {
+      console.error("Unable to update wishlist:", error);
+      showToast(error.response?.data?.message || "Unable to update your wishlist.");
+    });
   }
 
   const sizeLabel = product.sizes?.join(" / ");
 
   return (
     <div className="product">
-      <Link to={`/products/${product.slug}`} className="product-img">
+      <Link ref={impressionTargetRef} to={`/products/${product.slug}`} className="product-img">
+        <ProductImpressionBadge count={displayedImpressionCount} />
         {product.soldOut && <div className="stock-overlay"><strong>Out of stock</strong><span>Currently unavailable</span></div>}
         {product.soldOut && <span className="badge sold-out">SOLD OUT</span>}
         {!product.soldOut && product.isNew && <span className="badge new">NEW</span>}
@@ -63,7 +94,8 @@ export default function ProductCard({ product, showBuyNow = true }) {
             <Share2 size={16} strokeWidth={1.8} />
           </button>
           <button
-            title={liked ? "Unlike" : "Like"}
+            title={liked ? "Remove from wishlist" : "Add to wishlist"}
+            aria-label={liked ? "Remove from wishlist" : "Add to wishlist"}
             className={liked ? "liked" : ""}
             onClick={handleLike}
           >
@@ -80,6 +112,9 @@ export default function ProductCard({ product, showBuyNow = true }) {
         {product.discount > 0 && <del> Rs. {product.price.toLocaleString("en-IN")}</del>}
         {product.discount > 0 && <span className="discount-badge">{product.discount}% OFF</span>}
       </p>
+      <button className="add-to-cart-btn" type="button" onClick={handleAddToCart} disabled={product.soldOut}>
+        {product.soldOut ? "SOLD OUT" : "ADD TO CART"}
+      </button>
       {product.colors?.length > 0 && (
         <div className="swatches">
           {product.colors.map((c) => (

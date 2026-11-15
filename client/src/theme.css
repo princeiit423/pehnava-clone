@@ -1,0 +1,569 @@
+:root {
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #e8eeeb;
+  --muted: #a4b0ab;
+  --border: #35413d;
+  --theme-bg: #111719;
+  --theme-surface: #1a2224;
+  --theme-surface-raised: #222c2e;
+  --theme-text-muted: #a4b0ab;
+  --theme-text: #e8eeeb;
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] main {
+  background-color: var(--theme-bg);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] #root :is(h1, h2, h3, h4, h5, h6, p, span, strong, em, b, small, label, li, dt, dd, td, th, legend, figcaption, blockquote, a):not(button *):not([class*="btn"]):not([class*="button"]):not([class*="badge"]):not([class*="status"]):not(.error):not(.success-message):not(.hero *):not(.announcement *) {
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] header,
+html[data-theme="dark"] footer,
+html[data-theme="dark"] .mobile-bottom-nav,
+html[data-theme="dark"] .top-header,
+html[data-theme="dark"] .mobile-nav {
+  background-color: var(--theme-surface);
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] footer {
+  background-color: #0c1213;
+  color: #e8eeeb;
+}
+
+html[data-theme="dark"] footer > div:not(.footer-trust-highlights):not(.footer-payment-methods) h4 {
+  color: #f0f5f2;
+}
+
+html[data-theme="dark"] footer > div:not(.footer-trust-highlights):not(.footer-payment-methods) p {
+  color: #b6c2bc;
+}
+
+html[data-theme="dark"] footer > div:not(.footer-trust-highlights):not(.footer-payment-methods) a {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  margin-left: -8px;
+  border-radius: 6px;
+  color: #c5d0ca;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+html[data-theme="dark"] footer > div:not(.footer-trust-highlights):not(.footer-payment-methods) a:hover,
+html[data-theme="dark"] footer > div:not(.footer-trust-highlights):not(.footer-payment-methods) a:focus-visible {
+  background-color: #1c2925;
+  color: #d3f5b0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+html[data-theme="dark"] .footer-trust-highlights {
+  border-color: #34423a;
+  background: linear-gradient(135deg, #17211d 0%, #1c2822 100%);
+  color: #e8eeeb;
+}
+
+html[data-theme="dark"] .footer-trust-heading p {
+  color: #c9e8a7;
+}
+
+html[data-theme="dark"] .footer-trust-heading h3,
+html[data-theme="dark"] .footer-trust-heading > span {
+  color: #e8eeeb;
+}
+
+html[data-theme="dark"] .footer-trust-highlight,
+html[data-theme="dark"] .footer-trust-highlight:hover {
+  border-color: #3a4b41;
+  background: #202c27;
+  color: #e8eeeb;
+}
+
+html[data-theme="dark"] .footer-trust-highlight:hover,
+html[data-theme="dark"] .footer-trust-highlight:focus-visible {
+  border-color: #91b46e;
+  background: #2b3b32;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.3);
+}
+
+html[data-theme="dark"] .footer-trust-highlight-icon {
+  border-color: #465b4a;
+  background: #293a30;
+  color: #d3f5b0;
+}
+
+html[data-theme="dark"] .footer-trust-highlight-copy strong {
+  color: #f0f5f2;
+}
+
+html[data-theme="dark"] .footer-trust-highlight-copy > span,
+html[data-theme="dark"] .footer-trust-highlight-arrow {
+  color: #c0ccc5;
+}
+
+html[data-theme="dark"] .footer-payment-methods {
+  border-color: #35413d;
+}
+
+html[data-theme="dark"] .footer-payment-copy h3 {
+  color: #f0f5f2;
+}
+
+html[data-theme="dark"] .footer-payment-copy p {
+  color: #b6c2bc;
+}
+
+html[data-theme="dark"] .footer-payment-list li {
+  border-color: #d8dedb;
+  background: #fff;
+}
+
+html[data-theme="dark"] .trust-highlights,
+html[data-theme="dark"] .trust-highlight-icon,
+html[data-theme="dark"] .section-head a,
+html[data-theme="dark"] .category-strip-img,
+html[data-theme="dark"] .loading-image-shell,
+html[data-theme="dark"] .hero,
+html[data-theme="dark"] .hero-slide {
+  background-color: var(--theme-surface);
+  color: var(--theme-text);
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] .footer-trust-highlight {
+  background-color: var(--theme-surface-raised);
+  border-color: var(--border);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .mobile-nav a:hover,
+html[data-theme="dark"] .dropdown-menu,
+html[data-theme="dark"] .dropdown-menu a:hover {
+  background-color: var(--theme-surface-raised);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .cart-lines,
+html[data-theme="dark"] .cart-summary,
+html[data-theme="dark"] .account-overview-card,
+html[data-theme="dark"] .account-overview-link,
+html[data-theme="dark"] .account-dashboard .customer-order-card,
+html[data-theme="dark"] .account-dashboard .customer-return-request,
+html[data-theme="dark"] .account-dashboard .order-review-form,
+html[data-theme="dark"] .account-dashboard .submitted-order-review,
+html[data-theme="dark"] .account-auth .account-form,
+html[data-theme="dark"] .checkout-panel,
+html[data-theme="dark"] .checkout-summary,
+html[data-theme="dark"] .checkout-success,
+html[data-theme="dark"] .product-preview-dialog,
+html[data-theme="dark"] .product-stock-preview,
+html[data-theme="dark"] .admin-returns-area .admin-section,
+html[data-theme="dark"] .admin-return-card,
+html[data-theme="dark"] .admin-overview-welcome,
+html[data-theme="dark"] .admin-overview-panel,
+html[data-theme="dark"] .admin-overview-metric,
+html[data-theme="dark"] .admin-login form,
+html[data-theme="dark"] .admin-dashboard .admin-form,
+html[data-theme="dark"] .admin-dashboard .admin-products-list,
+html[data-theme="dark"] .admin-dashboard .admin-inventory-overview,
+html[data-theme="dark"] .admin-dashboard .admin-overview-panel,
+html[data-theme="dark"] .admin-dashboard .admin-overview-metric,
+html[data-theme="dark"] .admin-dashboard .admin-orders-date-metric,
+html[data-theme="dark"] .admin-dashboard .homepage-admin-section,
+html[data-theme="dark"] .admin-dashboard .homepage-admin-card,
+html[data-theme="dark"] .admin-dashboard .store-settings-list,
+html[data-theme="dark"] .store-settings-nav,
+html[data-theme="dark"] .coupon-admin .homepage-admin-section,
+html[data-theme="dark"] .filter-sidebar {
+  background-color: var(--theme-surface);
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] .account-overview-link:hover,
+html[data-theme="dark"] .admin-dashboard .admin-orders-date-metric.is-selected,
+html[data-theme="dark"] .store-settings-nav a[aria-current="page"] {
+  background-color: var(--theme-surface-raised);
+  border-color: #58714b;
+}
+
+html[data-theme="dark"] .admin-dashboard {
+  --admin-ink: var(--ink);
+  --admin-muted: var(--theme-text-muted);
+  --admin-line: var(--border);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .product-stock-preview > strong,
+html[data-theme="dark"] .product-stock-preview p,
+html[data-theme="dark"] .product-stock-preview small,
+html[data-theme="dark"] .admin-dashboard .admin-grid label,
+html[data-theme="dark"] .admin-dashboard .admin-table td,
+html[data-theme="dark"] .admin-dashboard .admin-table th,
+html[data-theme="dark"] .admin-dashboard .homepage-admin-card label,
+html[data-theme="dark"] .admin-dashboard .homepage-admin-section-head p,
+html[data-theme="dark"] .admin-dashboard .store-settings-row-head strong,
+html[data-theme="dark"] .admin-dashboard .admin-return-request p,
+html[data-theme="dark"] .admin-dashboard .admin-head-actions > button,
+html[data-theme="dark"] .admin-dashboard .admin-form-section-heading strong,
+html[data-theme="dark"] .account-dashboard,
+html[data-theme="dark"] .checkout-page,
+html[data-theme="dark"] .cart-page {
+  color: var(--ink);
+}
+
+html[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .admin-dashboard .admin-grid input:not([type="checkbox"]):not([type="color"]),
+html[data-theme="dark"] .admin-dashboard .admin-grid select,
+html[data-theme="dark"] .admin-dashboard .admin-grid textarea,
+html[data-theme="dark"] .admin-dashboard .admin-return-review-actions textarea,
+html[data-theme="dark"] .admin-dashboard .admin-search {
+  background-color: var(--theme-bg);
+  color: var(--ink);
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] table,
+html[data-theme="dark"] th,
+html[data-theme="dark"] td,
+html[data-theme="dark"] .admin-dashboard .admin-form-section-heading,
+html[data-theme="dark"] .admin-dashboard .admin-form-actions {
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] .admin-dashboard .admin-head-actions,
+html[data-theme="dark"] .admin-dashboard .product-inventory-field,
+html[data-theme="dark"] .admin-dashboard .admin-category-chips span,
+html[data-theme="dark"] .admin-dashboard .admin-cod-fee-note,
+html[data-theme="dark"] .admin-dashboard .admin-return-request,
+html[data-theme="dark"] .admin-dashboard .admin-form-actions {
+  background-color: var(--theme-surface-raised);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .admin-dashboard .admin-form-actions {
+  background-color: rgba(26, 34, 36, 0.96);
+}
+
+html[data-theme="dark"] .admin-dashboard .admin-head-actions > button:hover {
+  background-color: var(--theme-surface-raised);
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .admin-overview-quick-actions button + button,
+html[data-theme="dark"] .admin-overview-panel-head > button,
+html[data-theme="dark"] .admin-dashboard .admin-form-actions button[type="button"] {
+  background-color: var(--theme-surface-raised);
+  border-color: var(--border);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .admin-dashboard .admin-head-actions > button.admin-section-tab.is-active {
+  background-color: #b7f35c;
+  border-color: #b7f35c;
+  color: #172016;
+}
+
+html[data-theme="dark"] .customer-data-warning {
+  background-color: #392d1d;
+  border-color: #70552c;
+  color: #f0d7a8;
+}
+
+html[data-theme="dark"] .product-preview-total,
+html[data-theme="dark"] .admin-dashboard .product-stock-preview {
+  background-color: var(--theme-surface-raised);
+}
+
+html[data-theme="dark"] .admin-dashboard .store-settings-field,
+html[data-theme="dark"] .admin-dashboard .store-settings-checkbox {
+  color: var(--ink);
+}
+
+html[data-theme="dark"] .admin-dashboard .store-settings-row-head button,
+html[data-theme="dark"] .admin-dashboard .store-settings-form > section > button,
+html[data-theme="dark"] .admin-dashboard .homepage-admin-section-head > button {
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] .error {
+  color: #ffaaa5;
+}
+
+html[data-theme="dark"] .success-message {
+  color: #a8e8ad;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  min-width: 40px;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+}
+
+.theme-toggle:hover {
+  background-color: rgba(127, 145, 135, 0.12);
+}
+
+.theme-toggle:focus-visible {
+  outline: 3px solid rgba(183, 243, 92, 0.65);
+  outline-offset: 2px;
+}
+
+.theme-toggle-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nav-brand {
+  display: flex !important;
+  min-width: 0 !important;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: visible !important;
+  text-decoration: none;
+}
+
+.nav-brand-logo {
+  display: block;
+  width: clamp(100px, 9vw, 145px);
+  max-width: 100%;
+  max-height: 72px;
+  height: auto;
+  flex: 0 1 auto;
+  object-fit: contain;
+}
+
+.mobile-theme-toggle {
+  width: 100%;
+  justify-content: flex-start;
+  margin-top: 12px;
+  border-radius: 8px;
+}
+
+@media (max-width: 600px) {
+  .nav-brand {
+    justify-content: center;
+  }
+
+  .nav-brand-logo {
+    width: clamp(82px, 24vw, 104px);
+    max-height: 54px;
+  }
+}
+
+html[data-theme="dark"] #root :is(a, button, input, select, textarea):focus-visible {
+  outline: 3px solid #b7f35c;
+  outline-offset: 3px;
+}
+
+html[data-theme="dark"] #root :is(nav a, .filter-sidebar a, .filter-block a, footer a, .product-title, .pd-review-link, .order-help a, .showroom-details > a):hover {
+  color: #c9f58f;
+}
+
+html[data-theme="dark"] .dropdown-menu a:hover,
+html[data-theme="dark"] .mobile-nav a:hover,
+html[data-theme="dark"] .faq-question:hover,
+html[data-theme="dark"] .order-click-row:hover,
+html[data-theme="dark"] .trust-highlight:hover,
+html[data-theme="dark"] .footer-trust-highlight:hover,
+html[data-theme="dark"] .account-overview-link:hover,
+html[data-theme="dark"] .contact-card:hover,
+html[data-theme="dark"] .contact-card-static:hover,
+html[data-theme="dark"] footer > div:not(.footer-trust-highlights):not(.footer-payment-methods) a:hover,
+html[data-theme="dark"] footer > div:not(.footer-trust-highlights):not(.footer-payment-methods) a:focus-visible,
+html[data-theme="dark"] .admin-overview-panel-head > button:hover,
+html[data-theme="dark"] .admin-overview-quick-actions button + button:hover {
+  background-color: var(--theme-surface-raised);
+  border-color: #52635a;
+  color: var(--theme-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+html[data-theme="dark"] .search-collection-links a:hover,
+html[data-theme="dark"] .search-collection-links a:focus-visible,
+html[data-theme="dark"] .section-head > a:hover,
+html[data-theme="dark"] .category-strip-arrow:hover,
+html[data-theme="dark"] .color-feature-arrow:hover:not(:disabled),
+html[data-theme="dark"] .showroom-directions:hover,
+html[data-theme="dark"] .admin-head-actions .admin-section-tab:hover,
+html[data-theme="dark"] .admin-export-actions button:hover,
+html[data-theme="dark"] .order-help a:hover {
+  border-color: #82976e;
+  background-color: #35443a;
+  color: #eff8e8;
+}
+
+html[data-theme="dark"] .add-to-cart-btn:hover:not(:disabled),
+html[data-theme="dark"] .search-bar button:hover,
+html[data-theme="dark"] .hero-btn:hover,
+html[data-theme="dark"] .carousel-arrow:hover,
+html[data-theme="dark"] .card-icons button:hover,
+html[data-theme="dark"] .like-btn:hover,
+html[data-theme="dark"] .share-btn:hover,
+html[data-theme="dark"] .admin-table button:hover,
+html[data-theme="dark"] .admin-dashboard .admin-head-actions > button:hover,
+html[data-theme="dark"] .admin-dashboard .admin-form-actions button:hover,
+html[data-theme="dark"] .admin-order-notification-control button:hover,
+html[data-theme="dark"] .admin-section .order-detail-actions button:hover:not(.danger-button),
+html[data-theme="dark"] .custom-color-controls button:hover,
+html[data-theme="dark"] .custom-size-controls button:hover,
+html[data-theme="dark"] .mobile-nav-close:hover,
+html[data-theme="dark"] .mobile-menu-close:hover {
+  border-color: #73866a;
+  background-color: #35443a;
+  color: #eff8e8;
+}
+
+html[data-theme="dark"] .buy-now-btn:hover:not(:disabled),
+html[data-theme="dark"] .checkout-pay-button:hover:not(:disabled),
+html[data-theme="dark"] .admin-dashboard .admin-form-actions button:not([type="button"]):hover {
+  border-color: #c9f58f;
+  background-color: #b7f35c;
+  color: #172016;
+}
+
+html[data-theme="dark"] .customer-order-cancel button:hover:not(:disabled) {
+  border-color: #a95249;
+  background-color: #482b2a;
+  color: #ffd9d4;
+}
+
+html[data-theme="dark"] .admin-section .order-detail-actions .danger-button,
+html[data-theme="dark"] .admin-section .order-detail-actions .danger-button:hover {
+  border-color: #d35c5c;
+  background-color: #8f3036;
+  color: #fff;
+}
+
+html[data-theme="dark"] .swatch-link:hover,
+html[data-theme="dark"] .swatch-link:focus-visible,
+html[data-theme="dark"] .pd-thumbs img:hover,
+html[data-theme="dark"] .pd-thumbs img.active,
+html[data-theme="dark"] .pd-thumbs button:hover,
+html[data-theme="dark"] .pd-thumbs button.active {
+  border-color: #b7f35c;
+  box-shadow: 0 0 0 2px var(--theme-surface), 0 0 0 4px rgba(183, 243, 92, 0.7);
+}
+
+html[data-theme="dark"] .admin-dashboard .admin-cod-toggle.is-enabled {
+  border-color: #527a50;
+  background-color: #203b2c;
+  color: #c9f5cf;
+}
+
+html[data-theme="dark"] .admin-dashboard .admin-cod-toggle.is-disabled {
+  border-color: #8a4c46;
+  background-color: #482b2a;
+  color: #ffd9d4;
+}
+
+html[data-theme="dark"] input[type="checkbox"],
+html[data-theme="dark"] input[type="radio"] {
+  accent-color: #b7f35c;
+}
+
+html[data-theme="dark"] .account-dashboard .customer-order-card {
+  border-color: #35413d;
+  background-color: #1a2224;
+  color: #e8eeeb;
+}
+
+html[data-theme="dark"] .account-dashboard .customer-order-heading {
+  border-color: #35413d;
+}
+
+html[data-theme="dark"] #root .account-dashboard .customer-order-heading strong,
+html[data-theme="dark"] #root .account-dashboard .customer-order-cancel strong {
+  color: #f0f5f2 !important;
+}
+
+html[data-theme="dark"] #root .account-dashboard .customer-order-heading span,
+html[data-theme="dark"] #root .account-dashboard .customer-order-cancel span,
+html[data-theme="dark"] #root .account-dashboard .customer-cod-fee,
+html[data-theme="dark"] #root .account-dashboard .cancelled-payment-note {
+  color: #bcc8c1 !important;
+}
+
+html[data-theme="dark"] .account-dashboard .customer-order-cancel {
+  border-color: #52423e;
+  background-color: #272321;
+}
+
+html[data-theme="dark"] .account-dashboard .customer-order-cancel button {
+  border-color: #8f514a;
+  background-color: #392624;
+  color: #ffd2cc;
+}
+
+html[data-theme="dark"] .account-dashboard .customer-order-cancel button:hover:not(:disabled) {
+  border-color: #d4776a;
+  background-color: #55302d;
+  color: #fff0ed;
+}
+
+html[data-theme="dark"] .account-dashboard .customer-order-cancel button:focus-visible {
+  outline: 3px solid #ffaaa0;
+  outline-offset: 3px;
+}
+
+html[data-theme="dark"] .account-dashboard .customer-order-cancel .error {
+  padding: 8px 10px;
+  border: 1px solid #8e4945;
+  border-radius: 6px;
+  background-color: #3e2424;
+  color: #ffd2cc;
+}
+
+html[data-theme="dark"] .account-dashboard .order-phase-track.is-cancelled {
+  border: 1px solid #874b46;
+  background-color: #392322;
+  color: #ffd2cc;
+}
+
+html[data-theme="dark"] .account-dashboard .order-help {
+  border-color: #354940;
+  background-color: #18221e;
+  color: #e8eeeb;
+}
+
+html[data-theme="dark"] #root .account-dashboard .order-help h2 {
+  color: #f0f5f2 !important;
+}
+
+html[data-theme="dark"] #root .account-dashboard .order-help p {
+  color: #bcc8c1 !important;
+}
+
+html[data-theme="dark"] #root .account-dashboard .order-help a {
+  border-color: #526357;
+  background-color: #222f29;
+  color: #d7e5dc !important;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+html[data-theme="dark"] #root .account-dashboard .order-help a:hover,
+html[data-theme="dark"] #root .account-dashboard .order-help a:focus-visible {
+  border-color: #91b46e;
+  background-color: #304337;
+  color: #e0f6c8 !important;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

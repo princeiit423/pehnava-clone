@@ -1,10 +1,13 @@
 export const DEFAULT_HOME_CAROUSELS = [
-  { id: "new-drop", title: "New Drop", source: "newest", categorySlug: "", collectionSlug: "trending" },
-  { id: "ready-to-wear", title: "Ready To Wear", source: "tag", productTag: "ready-to-wear", categorySlug: "stitched-wear", collectionSlug: "stitched-wear" },
-  { id: "unstitched", title: "Unstitched", source: "tag", productTag: "Unstitched", categorySlug: "Unstitched", collectionSlug: "unstitched" },
-  { id: "suits-under-1699", title: "Suits Under ₹1,699", source: "price", maxPrice: 1699, categorySlug: "", collectionSlug: "suits-under-1699" },
-  { id: "suits-1700-3000", title: "₹1,700 - ₹3,000", source: "price", minPrice: 1700, maxPrice: 3000, categorySlug: "", collectionSlug: "suits-1700-3000" },
-  { id: "premium-suits-above-3000", title: "Premium 3000+", source: "price", minPrice: 3000, minExclusive: true, categorySlug: "", collectionSlug: "premium-suits-above-3-000" },
+  { id: "new-drop", title: "New Arrivals", source: "newest", categorySlug: "", collectionSlug: "trending" },
+  { id: "tees-and-polos", title: "Tees & Polos", source: "tag", productTag: "tees-and-polos", categorySlug: "stitched-wear", collectionSlug: "stitched-wear" },
+  { id: "everyday-shirts", title: "Everyday Shirts", source: "tag", productTag: "everyday-shirts", categorySlug: "daily-wear", collectionSlug: "daily-wear" },
+  { id: "casual-bottoms", title: "Casual Bottoms", source: "tag", productTag: "casual-bottoms", categorySlug: "party-wear", collectionSlug: "party-wear" },
+  { id: "layers", title: "Layers & Overshirts", source: "tag", productTag: "layers", categorySlug: "festive-wear", collectionSlug: "festive-wear" },
+  { id: "essentials", title: "Everyday Essentials", source: "tag", productTag: "essentials", categorySlug: "readymade", collectionSlug: "readymade" },
+  { id: "essentials-under-1699", title: "Essentials Under ₹1,699", source: "price", maxPrice: 1699, categorySlug: "", collectionSlug: "suits-under-1699" },
+  { id: "everyday-1700-3000", title: "Everyday Wear ₹1,700–₹3,000", source: "price", minPrice: 1700, maxPrice: 3000, categorySlug: "", collectionSlug: "suits-1700-3000" },
+  { id: "premium-above-3000", title: "Premium Picks ₹3,000+", source: "price", minPrice: 3000, minExclusive: true, categorySlug: "", collectionSlug: "premium-suits-above-3-000" },
 ].map((section, order) => ({ ...section, active: true, order }));
 
 export function getOrderedHomeCarousels(sections = DEFAULT_HOME_CAROUSELS) {

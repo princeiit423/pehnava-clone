@@ -58,7 +58,7 @@ export async function uploadReviewImage(file) {
   const client = getCloudinary();
   return new Promise((resolve, reject) => {
     const stream = client.uploader.upload_stream(
-      { folder: "pehnava/reviews", resource_type: "image" },
+      { folder: "racoonbro/reviews", resource_type: "image" },
       (error, result) => {
         if (error) return reject(error);
         if (!result?.secure_url || !result?.public_id) {

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, setCustomerToken } from "../api.js";
-import { Camera, Eye, EyeOff, MessageCircle, Mail } from "lucide-react";
+import { ArrowRight, Ban, Eye, EyeOff, Mail, PackageCheck, RotateCcw } from "lucide-react";
+import { hasCheckoutItems } from "../utils/checkout.js";
 
 const ORDER_PHASES = [
   ["order_placed", "Order Placed"],
@@ -29,6 +30,19 @@ function orderStatusLabel(status) {
   return ORDER_PHASES.find(([value]) => value === normalizedStatus(status))?.[1] || status;
 }
 
+function canRequestReturn(order, now = Date.now()) {
+  if (normalizedStatus(order.status) !== "delivered") return false;
+  const deliveredAt = order.deliveredAt || order.updatedAt;
+  const deliveryTime = new Date(deliveredAt).getTime();
+  return Number.isFinite(deliveryTime)
+    && now >= deliveryTime
+    && now <= deliveryTime + 7 * 24 * 60 * 60 * 1000;
+}
+
+function canCancelOrder(status) {
+  return ["order_placed", "payment_confirmed"].includes(normalizedStatus(status));
+}
+
 export default function Account() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -46,6 +60,11 @@ export default function Account() {
   const [reviewErrors, setReviewErrors] = useState({});
   const [savingReview, setSavingReview] = useState("");
   const [deletingReview, setDeletingReview] = useState("");
+  const [returnDrafts, setReturnDrafts] = useState({});
+  const [returnErrors, setReturnErrors] = useState({});
+  const [savingReturn, setSavingReturn] = useState("");
+  const [cancellingOrder, setCancellingOrder] = useState("");
+  const [cancelErrors, setCancelErrors] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +72,7 @@ export default function Account() {
       .then((res) => {
         if (cancelled) return;
         setCustomer(res.data);
-        if (searchParams.get("checkout") === "1" && sessionStorage.getItem("kcs_checkout_item")) {
+        if (searchParams.get("checkout") === "1" && hasCheckoutItems()) {
           navigate("/checkout", { replace: true });
         }
       })
@@ -98,7 +117,7 @@ export default function Account() {
       const res = await api.post(`/customers/${mode}`, payload);
       setCustomerToken(res.data.token);
       setCustomer(res.data.customer);
-      if (searchParams.get("checkout") === "1" && sessionStorage.getItem("kcs_checkout_item")) {
+      if (searchParams.get("checkout") === "1" && hasCheckoutItems()) {
         navigate("/checkout", { replace: true });
       }
     } catch (err) {
@@ -108,6 +127,50 @@ export default function Account() {
 
   function getProductReview(order, item) {
     return reviews.find((review) => review.order === order._id && review.product === item.productId);
+  }
+
+  async function submitReturnRequest(order) {
+    const draft = returnDrafts[order._id] || { type: "return", reason: "" };
+    setReturnErrors((current) => ({ ...current, [order._id]: "" }));
+    setSavingReturn(order._id);
+    try {
+      const { data } = await api.post(`/orders/${order._id}/return-request`, draft);
+      setOrders((current) => current.map((entry) => entry._id === order._id ? data : entry));
+      setReturnDrafts((current) => {
+        const next = { ...current };
+        delete next[order._id];
+        return next;
+      });
+    } catch (requestError) {
+      setReturnErrors((current) => ({
+        ...current,
+        [order._id]: requestError.response?.data?.message || "Unable to submit your request. Please try again.",
+      }));
+    } finally {
+      setSavingReturn("");
+    }
+  }
+
+  async function cancelOrder(order) {
+    const paidOnline = order.paymentMethod !== "cod";
+    const confirmation = paidOnline
+      ? "Cancel this order? Any eligible online-payment refund is handled manually and is not issued automatically."
+      : "Cancel this order? This action cannot be undone.";
+    if (!window.confirm(confirmation)) return;
+
+    setCancelErrors((current) => ({ ...current, [order._id]: "" }));
+    setCancellingOrder(order._id);
+    try {
+      const { data } = await api.post(`/orders/${order._id}/cancel`);
+      setOrders((current) => current.map((entry) => entry._id === order._id ? data : entry));
+    } catch (cancelError) {
+      setCancelErrors((current) => ({
+        ...current,
+        [order._id]: cancelError.response?.data?.message || "Unable to cancel this order. Please try again.",
+      }));
+    } finally {
+      setCancellingOrder("");
+    }
   }
 
   async function submitReview(order, item, key) {
@@ -172,12 +235,12 @@ export default function Account() {
   }
 
   if (loadingAccount) {
-    return <main className="account-page"><p>Checking your account…</p></main>;
+    return <main className="account-page account-loading"><p>Checking your account…</p></main>;
   }
 
   if (!customer) {
     return (
-      <main className="account-page">
+      <main className="account-page account-auth">
         <form className="account-form" onSubmit={submit}>
           <h1>{mode === "login" ? "Your account" : "Create account"}</h1>
           {mode === "register" && <input placeholder="Full name" required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />}
@@ -226,34 +289,89 @@ export default function Account() {
   }
 
   return (
-    <main className="account-page">
+    <main className="account-page account-dashboard">
       <div className="account-head">
-        <div><p className="eyebrow">Welcome back</p><h1>{customer.name}</h1><p>{customer.phone}{customer.email ? ` | ${customer.email}` : ""}</p></div>
-        <button onClick={() => { setCustomerToken(null); setCustomer(null); setOrders([]); setReviews([]); }}>Sign out</button>
+        <div className="account-welcome">
+          <p className="eyebrow">YOUR RACOONBRO ACCOUNT</p>
+          <h1>Welcome back, {String(customer.name || "there").split(" ")[0]}</h1>
+          <p>
+            {customer.phone}
+            {customer.phone && customer.email && <span aria-hidden="true"> · </span>}
+            {customer.email}
+          </p>
+        </div>
+        <button className="account-signout" onClick={() => { setCustomerToken(null); setCustomer(null); setOrders([]); setReviews([]); }}>Sign out</button>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
-      {searchParams.get("orderPlaced") && <p className="checkout-success" role="status">Payment confirmed — your order is placed. You can follow its progress below.</p>}
+      {searchParams.get("orderPlaced") && <p className="checkout-success" role="status">
+        {searchParams.get("paymentMethod") === "cod"
+          ? "Your cash-on-delivery order is placed. Pay the displayed order total at delivery."
+          : "Payment confirmed — your order is placed."} You can follow its progress below.
+      </p>}
+      <section className="account-overview" aria-label="Account overview">
+        <article className="account-overview-card">
+          <span className="account-overview-icon"><PackageCheck size={18} /></span>
+          <span><small>Orders placed</small><strong>{orders.length}</strong></span>
+        </article>
+        <article className="account-overview-card">
+          <span className="account-overview-icon"><RotateCcw size={18} /></span>
+          <span><small>Requests in review</small><strong>{orders.filter((order) => order.returnRequest?.status === "requested").length}</strong></span>
+        </article>
+        <Link className="account-overview-link" to="/refund-policy">
+          <span><small>Need to return or exchange?</small><strong>View our 7-day policy</strong></span>
+          <ArrowRight size={17} />
+        </Link>
+      </section>
       <section className="orders">
-        <h2>Your orders</h2>
+        <div className="account-section-heading">
+          <div><p className="eyebrow">ORDER HISTORY</p><h2>Your orders</h2></div>
+          <span>{orders.length} {orders.length === 1 ? "order" : "orders"}</span>
+        </div>
         {loadingOrders ? <p>Loading your orders…</p> : orders.length ? orders.map((order) => {
           const status = normalizedStatus(order.status);
           const phaseIndex = ORDER_PHASES.findIndex(([value]) => value === status);
           const cancelled = status === "cancelled_refund";
+          const canCancel = canCancelOrder(status);
           return (
             <article className="order-row customer-order-card" key={order._id}>
               <div className="customer-order-heading">
                 <div><strong>Order #{order._id.slice(-8).toUpperCase()}</strong><span>{new Date(order.createdAt).toLocaleDateString("en-IN")}</span></div>
-                <div><strong>Rs. {Number(order.total || 0).toLocaleString("en-IN")}</strong><span className={`order-status status-${status}`}>{orderStatusLabel(status)}</span></div>
+                <div><strong>Rs. {Number(order.total || 0).toLocaleString("en-IN")}</strong><span className={`order-status status-${status}`}>{cancelled && order.paymentMethod === "cod" ? "Cancelled" : orderStatusLabel(status)}</span></div>
               </div>
+              {order.codFee > 0 && <p className="customer-cod-fee">
+                Cash on delivery · Items Rs. {Number(order.itemSubtotal || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {order.couponDiscount > 0 && <> − Rs. {Number(order.couponDiscount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} coupon ({order.couponCode})</>}
+                {" + "}Rs. {Number(order.codFee).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} handling fee
+              </p>}
+              {order.couponDiscount > 0 && order.codFee <= 0 && <p className="customer-cod-fee">
+                Coupon {order.couponCode} · You saved Rs. {Number(order.couponDiscount).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>}
               <div className={`order-phase-track${cancelled ? " is-cancelled" : ""}`} aria-label={`Order status: ${orderStatusLabel(status)}`}>
-                {cancelled ? <strong>Cancelled / Refund</strong> : ORDER_PHASES.map(([value, label], index) => (
+                {cancelled ? <strong>{order.paymentMethod === "cod" ? "Cancelled" : "Cancelled / Refund"}</strong> : ORDER_PHASES.map(([value, label], index) => (
                   <div key={value} className={`order-phase${index <= phaseIndex ? " is-complete" : ""}${index === phaseIndex ? " is-current" : ""}`}>
                     <i />
                     <span>{label}</span>
                   </div>
                 ))}
               </div>
-              {cancelled && <p className="cancelled-payment-note">Any eligible payment refund is processed manually; this status does not issue an automatic refund.</p>}
+              {cancelled && order.paymentMethod !== "cod" && <p className="cancelled-payment-note">Any eligible online-payment refund is handled manually; it is not issued automatically.</p>}
+              {canCancel && (
+                <div className="customer-order-cancel">
+                  <div>
+                    <strong>Changed your mind?</strong>
+                    <span>Cancel any time before the store starts processing your order.</span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={Boolean(cancellingOrder)}
+                    onClick={() => cancelOrder(order)}
+                  >
+                    <Ban size={15} aria-hidden="true" />
+                    {cancellingOrder === order._id ? "Cancelling…" : "Cancel order"}
+                  </button>
+                  {cancelErrors[order._id] && <p className="error" role="alert">{cancelErrors[order._id]}</p>}
+                </div>
+              )}
               <div className="customer-order-items">
                 {(order.items || []).map((item, index) => (
                   (() => {
@@ -373,6 +491,48 @@ export default function Account() {
               </div>
               {(order.carrier || order.trackingNumber) && <p className="customer-tracking"><strong>Tracking:</strong> {order.carrier || "Carrier"}{order.trackingNumber ? ` · ${order.trackingNumber}` : ""}</p>}
               {order.editedAt && <p className="order-edited-note">Order information updated by store on {new Date(order.editedAt).toLocaleString("en-IN")}.</p>}
+              {order.returnRequest ? (
+                <section className="customer-return-request">
+                  <h3>{order.returnRequest.type === "exchange" ? "Exchange request" : "Return request"} · {order.returnRequest.status}</h3>
+                  <p>{order.returnRequest.reason}</p>
+                  {order.returnRequest.adminNote && <p><strong>Store response:</strong> {order.returnRequest.adminNote}</p>}
+                </section>
+              ) : status === "delivered" && canRequestReturn(order) ? (
+                <form className="customer-return-request" onSubmit={(event) => { event.preventDefault(); submitReturnRequest(order); }}>
+                  <h3>Return or exchange within 7 days</h3>
+                  <p>Requests are reviewed by our team. This request does not automatically approve a refund or exchange.</p>
+                  <label>Request type
+                    <select
+                      value={returnDrafts[order._id]?.type || "return"}
+                      onChange={(event) => setReturnDrafts((current) => ({
+                        ...current,
+                        [order._id]: { type: event.target.value, reason: current[order._id]?.reason || "" },
+                      }))}
+                    >
+                      <option value="return">Return</option>
+                      <option value="exchange">Exchange</option>
+                    </select>
+                  </label>
+                  <label>Reason
+                    <textarea
+                      required
+                      minLength="5"
+                      maxLength="1000"
+                      value={returnDrafts[order._id]?.reason || ""}
+                      onChange={(event) => setReturnDrafts((current) => ({
+                        ...current,
+                        [order._id]: { type: current[order._id]?.type || "return", reason: event.target.value },
+                      }))}
+                    />
+                  </label>
+                  {returnErrors[order._id] && <p className="error" role="alert">{returnErrors[order._id]}</p>}
+                  <button type="submit" disabled={savingReturn === order._id}>
+                    {savingReturn === order._id ? "Submitting…" : "Submit return / exchange request"}
+                  </button>
+                </form>
+              ) : status === "delivered" ? (
+                <p className="customer-return-window-closed">The 7-day return and exchange request window has ended.</p>
+              ) : null}
             </article>
           );
         }) : <p>No orders yet.</p>}
@@ -381,9 +541,7 @@ export default function Account() {
         <h2>Need help with your order?</h2>
         <p>Contact our team and share your order number for faster help.</p>
         <div>
-          <a href="https://www.instagram.com/kashmirclothstores/" target="_blank" rel="noreferrer"><Camera size={17} /> Instagram</a>
-          <a href="https://wa.me/917004281547" target="_blank" rel="noreferrer"><MessageCircle size={17} /> WhatsApp · 7004281547</a>
-          <a href="mailto:amaanhussain786pr@gmail.com"><Mail size={17} /> amaanhussain786pr@gmail.com</a>
+          <a href="mailto:racoonbro777@gmail.com"><Mail size={17} /> racoonbro777@gmail.com</a>
         </div>
       </section>
     </main>

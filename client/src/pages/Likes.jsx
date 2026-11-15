@@ -41,10 +41,10 @@ export default function Likes() {
 
   return (
     <main className="products-section">
-      <h2>My Liked Products</h2>
+      <h2>My Wishlist</h2>
       {loading && <LoadingState label="Loading your liked products" />}
       {loadError && <p className="loading-error" role="alert">{loadError}</p>}
-      {!loading && !loadError && products.length === 0 && <p>You haven't liked any products yet.</p>}
+      {!loading && !loadError && products.length === 0 && <p>Your wishlist is empty. Save products you like to find them here later.</p>}
       <div className="product-row grid4" aria-busy={loading}>
         {loading ? <ProductSkeletons count={8} /> : products.map((p) => (
           <ProductCard key={p._id} product={p} />

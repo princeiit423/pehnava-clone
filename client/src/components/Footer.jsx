@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { CATEGORIES } from "../categories.js";
 import { api } from "../api.js";
+import { FooterPaymentMethods, FooterTrustHighlights } from "./TrustHighlights.jsx";
 
 export default function Footer() {
   const [storefront, setStorefront] = useState(null);
@@ -14,21 +15,23 @@ export default function Footer() {
     ? (storefront.categories || []).filter((category) => category.active !== false && category.type !== "price")
     : CATEGORIES;
   const footer = storefront?.footer || {};
-  const description = footer.description ?? "Beautiful Sarees, Lehenga, stitched & unstitched Suits for Women. Shirting & Suiting, Coat-Pant, Kurta and Sherwani Fabrics for Men.";
-  const address = footer.address ?? "Main Road Phusro Bazar, Bokaro, Jharkhand, India";
-  const instagramUrl = footer.instagramUrl || "https://www.instagram.com/kashmirclothstores/";
+  const description = footer.description ?? "Everyday clothing for men: comfortable tees, easy shirts, dependable bottoms and versatile layers.";
+  const address = footer.address ?? "";
+  const instagramUrl = footer.instagramUrl || "";
 
   return (
     <footer>
+      <FooterTrustHighlights />
+      <FooterPaymentMethods />
+
       {/* BRAND */}
       <div className="footer-brand">
         <div className="logo">
-          KASHMIR
-          <small>CLOTH STORES</small>
+          <img className="brand-logo-image footer-logo-image" src="/Logos/RacoonBro_primary_logo.png" alt="RacoonBro — Wear the Attitude" />
         </div>
 
         <p className="footer-description">{description}</p>
-        <p><b>Address:</b> {address}</p>
+        {address && <p><b>Address:</b> {address}</p>}
 
       </div>
 
@@ -61,6 +64,11 @@ export default function Footer() {
         <Link to="/frequently-asked-questions">
           Frequently Asked Questions
         </Link>
+
+        <Link to="/contact">Contact support</Link>
+        <a href={`mailto:${storefront?.contact?.email || "racoonbro777@gmail.com"}`}>
+          {storefront?.contact?.email || "racoonbro777@gmail.com"}
+        </a>
       </div>
 
       {/* ABOUT */}
@@ -77,22 +85,16 @@ export default function Footer() {
       </div>
 
       {/* FOLLOW */}
-      <div>
+      {(instagramUrl || footer.links?.length > 0) && <div>
         <h4>FOLLOW</h4>
 
-        <a
-          href={instagramUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Instagram
-        </a>
+        {instagramUrl && <a href={instagramUrl} target="_blank" rel="noreferrer">Instagram</a>}
         {(footer.links || []).map((link, index) => (
           /^https?:\/\//i.test(link.url)
             ? <a key={`${link.url}-${index}`} href={link.url} target="_blank" rel="noreferrer">{link.label}</a>
             : <Link key={`${link.url}-${index}`} to={link.url}>{link.label}</Link>
         ))}
-      </div>
+      </div>}
     </footer>
   );
 }

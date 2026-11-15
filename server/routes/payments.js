@@ -3,36 +3,25 @@ import crypto from "node:crypto";
 import mongoose from "mongoose";
 import { requireCustomer } from "../middleware/auth.js";
 import Product from "../models/Product.js";
+import Coupon from "../models/Coupon.js";
 import PaymentIntent from "../models/PaymentIntent.js";
 import { createPaymentItemSnapshot } from "../utils/paymentItems.js";
+import { calculateItemSubtotal, normalizeShippingAddress } from "../utils/orderCheckout.js";
 import { asyncHandler, requestRazorpay } from "../utils/razorpay.js";
+import { calculateCouponDiscount, normalizeCouponCode } from "../utils/coupons.js";
+import { checkoutRateLimiter } from "../middleware/rateLimit.js";
 
 const router = express.Router();
 const FEEDBACK_REASONS = ["payment_method", "technical_issue", "changed_mind", "need_help", "other"];
 
-router.post("/razorpay/order", requireCustomer, asyncHandler(async (req, res) => {
+router.post("/razorpay/order", requireCustomer, checkoutRateLimiter, asyncHandler(async (req, res) => {
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) return res.status(503).json({ message: "Razorpay is not configured" });
   const { items, shippingAddress } = req.body || {};
+  const couponCode = req.body?.couponCode ? normalizeCouponCode(req.body.couponCode) : "";
   if (!Array.isArray(items) || !items.length || items.length > 30 || !shippingAddress) {
     return res.status(400).json({ message: "A valid item and shipping address are required" });
   }
-  const requiredAddressFields = ["name", "phone", "address", "city", "state", "pinCode"];
-  const address = Object.fromEntries(requiredAddressFields.map((field) => [field, String(shippingAddress[field] || "").trim()]));
-  address.email = String(shippingAddress.email || "").trim().toLowerCase();
-  if (
-    requiredAddressFields.some((field) => !address[field]) ||
-    address.name.length > 100 ||
-    address.address.length > 250 ||
-    address.city.length > 80 ||
-    address.state.length > 80 ||
-    !/^[6-9]\d{9}$/.test(address.phone.replace(/\D/g, "")) ||
-    !/^\d{6}$/.test(address.pinCode)
-  ) {
-    return res.status(400).json({ message: "Enter a complete shipping address and valid 10-digit Indian phone number" });
-  }
-  if (address.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email)) {
-    return res.status(400).json({ message: "Enter a valid email address" });
-  }
+  const address = normalizeShippingAddress(shippingAddress);
 
   try {
     const productIds = items.map((item) => String(item.productId || ""));
@@ -73,7 +62,10 @@ router.post("/razorpay/order", requireCustomer, asyncHandler(async (req, res) =>
       trustedItems.push(snapshot);
     }
 
-    const total = Number(trustedItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2));
+    const itemSubtotal = calculateItemSubtotal(trustedItems);
+    const coupon = couponCode ? await Coupon.findOne({ code: couponCode }).lean() : null;
+    const couponDiscount = couponCode ? calculateCouponDiscount(coupon, itemSubtotal) : 0;
+    const total = Number((itemSubtotal - couponDiscount).toFixed(2));
     const amountPaise = Math.round(total * 100);
     if (!Number.isSafeInteger(amountPaise) || amountPaise < 100) {
       return res.status(400).json({ message: "Order total must be at least Rs. 1" });
@@ -97,6 +89,9 @@ router.post("/razorpay/order", requireCustomer, asyncHandler(async (req, res) =>
       customer: req.user.sub,
       items: trustedItems,
       total,
+      itemSubtotal,
+      couponCode,
+      couponDiscount,
       amountPaise,
       shippingAddress: address,
       razorpayOrderId: gatewayOrder.id,
@@ -106,7 +101,7 @@ router.post("/razorpay/order", requireCustomer, asyncHandler(async (req, res) =>
       amount: gatewayOrder.amount,
       currency: gatewayOrder.currency,
       keyId: process.env.RAZORPAY_KEY_ID,
-      name: "Kashmir Cloth Stores",
+      name: "RacoonBro",
       description: "Secure order payment",
     });
   } catch (error) {
@@ -115,7 +110,7 @@ router.post("/razorpay/order", requireCustomer, asyncHandler(async (req, res) =>
   }
 }));
 
-router.post("/razorpay/verify", requireCustomer, asyncHandler(async (req, res) => {
+router.post("/razorpay/verify", requireCustomer, checkoutRateLimiter, asyncHandler(async (req, res) => {
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) return res.status(503).json({ message: "Razorpay is not configured" });
   const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body || {};
   if (!orderId || !paymentId || !signature) return res.status(400).json({ message: "Razorpay payment details are incomplete" });

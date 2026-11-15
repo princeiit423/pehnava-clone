@@ -22,6 +22,9 @@ export function setCustomerToken(token) {
     delete api.defaults.headers.common["X-Customer-Authorization"];
     localStorage.removeItem("kcs_customer_token");
   }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("customer-auth-changed"));
+  }
 }
 
 const savedToken = localStorage.getItem("kcs_admin_token");

@@ -2,6 +2,25 @@ import React, { useMemo, useState } from "react";
 import { Camera, ChevronLeft, ChevronRight, Clock3, MapPin, Phone, Play, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import LoadingImage from "./LoadingImage.jsx";
+import { useProductImpression } from "../hooks/useProductImpression.js";
+import ProductImpressionBadge from "./ProductImpressionBadge.jsx";
+
+function ColorProductCard({ product, colorName }) {
+  const { targetRef, impressionCount } = useProductImpression(product._id);
+
+  return (
+    <div>
+      <Link ref={targetRef} to={`/products/${product.slug}?color=${encodeURIComponent(colorName)}`} className="product-img">
+        <ProductImpressionBadge count={impressionCount ?? product.impressionCount} />
+        <LoadingImage src={product.images?.[0]} alt={product.title} />
+      </Link>
+      <Link to={`/products/${product.slug}?color=${encodeURIComponent(colorName)}`} className="product-title">
+        {product.title}
+      </Link>
+      <p className="product-price">₹{Number(product.price).toLocaleString("en-IN")}</p>
+    </div>
+  );
+}
 
 function safeMediaUrl(value) {
   try {
@@ -68,16 +87,9 @@ export default function HomeFeatures({ products, content, storefrontSettings, sh
   const reviews = (content.reviews || []).filter(
     (review) => review.customerName && review.text && Number.isInteger(Number(review.rating)) && Number(review.rating) >= 1 && Number(review.rating) <= 5
   );
-  const showroomImages = content.showroomImages?.length
-    ? content.showroomImages
-    : ["/showroom/kashmir-storefront.png"];
-  const locations = storefrontSettings ? (storefrontSettings.locations || []) : [{
-    name: "Kashmir Cloth Stores",
-    address: "Main Road Phusro Bazar, Bokaro, Jharkhand, India",
-    hours: "Mon–Sun · 10:00 AM to 9:30 PM",
-    phone: "8292864636",
-    mapsUrl: "https://www.google.com/maps/place/Kashmir+Cloth+Stores/@23.7646426,85.9942364,17z/data=!3m1!4b1!4m6!3m5!1s0x39f41434070458e1:0x541b350a7ae45272!8m2!3d23.7646377!4d85.9968113!16s%2Fg%2F11c4k748fp?entry=ttu&g_ep=EgoyMDI2MTAxOS4wIKXMDSoASAFQAw%3D%3D",
-  }];
+  const showroomImages = content.showroomImages || [];
+  const locations = storefrontSettings?.locations || [];
+  const instagramUrl = storefrontSettings?.contact?.instagram || "";
   const showroom = storefrontSettings?.showroom || {};
   const shopColors = storefrontSettings?.shopColors || {};
 
@@ -88,7 +100,7 @@ export default function HomeFeatures({ products, content, storefrontSettings, sh
           <div className="home-feature-heading">
             <p className="home-feature-kicker">{shopColors.kicker || "Find your shade"}</p>
             <h2>{shopColors.heading || "Shop by Color"}</h2>
-            <p>{shopColors.description || "Explore suits in the colors you love."}</p>
+            <p>{shopColors.description || "Find everyday pieces in colors you’ll reach for again and again."}</p>
           </div>
 
           <div className="color-feature-controls">
@@ -129,7 +141,7 @@ export default function HomeFeatures({ products, content, storefrontSettings, sh
                 <span className="color-feature-shade" />
                 <span className="color-feature-label">
                   <i style={{ backgroundColor: color.hex }} />
-                  {color.name}
+                  <span>{color.name}</span>
                 </span>
               </button>
             ))}
@@ -156,15 +168,7 @@ export default function HomeFeatures({ products, content, storefrontSettings, sh
               </div>
               <div className="product-row color-product-row">
                 {matchingColor.products.slice(0, 8).map((product) => (
-                  <div key={product._id}>
-                    <Link to={`/products/${product.slug}?color=${encodeURIComponent(matchingColor.name)}`} className="product-img">
-                      <LoadingImage src={product.images?.[0]} alt={product.title} />
-                    </Link>
-                    <Link to={`/products/${product.slug}?color=${encodeURIComponent(matchingColor.name)}`} className="product-title">
-                      {product.title}
-                    </Link>
-                    <p className="product-price">₹{Number(product.price).toLocaleString("en-IN")}</p>
-                  </div>
+                  <ColorProductCard key={product._id} product={product} colorName={matchingColor.name} />
                 ))}
               </div>
             </div>
@@ -215,7 +219,7 @@ export default function HomeFeatures({ products, content, storefrontSettings, sh
           <div className="home-feature-heading">
             <p className="home-feature-kicker">Follow our journey</p>
             <h2>Visit our <span>Instagram</span></h2>
-            <p>New looks, styling ideas and a little Kashmir in every post.</p>
+            <p>Fresh fits and everyday styling ideas from RacoonBro.</p>
           </div>
           <div className="social-card-grid instagram-grid">
             {instagramPosts.map((post, index) => (
@@ -227,21 +231,21 @@ export default function HomeFeatures({ products, content, storefrontSettings, sh
                 rel="noreferrer"
                 aria-label={post.caption || "View Instagram post"}
               >
-                <LoadingImage src={post.mediaUrl} alt={post.caption || "Kashmir Cloth Stores on Instagram"} />
+                <LoadingImage src={post.mediaUrl} alt={post.caption || "RacoonBro on Instagram"} />
                 <span className="instagram-card-icon"><Camera size={22} aria-hidden="true" /></span>
                 {post.caption && <span className="instagram-card-caption">{post.caption}</span>}
               </a>
             ))}
           </div>
-          <a
+          {instagramUrl && <a
             className="instagram-follow-button"
-            href="https://www.instagram.com/kashmirclothstores/"
+            href={instagramUrl}
             target="_blank"
             rel="noreferrer"
           >
             <Camera size={17} aria-hidden="true" />
             Visit Instagram
-          </a>
+          </a>}
         </section>
       )}
 
@@ -267,10 +271,10 @@ export default function HomeFeatures({ products, content, storefrontSettings, sh
         </section>
       )}
 
-      {showShowroom && (
+      {showShowroom && locations.length > 0 && showroomImages.length > 0 && (
         <section className="showroom-section" aria-labelledby="showroom-title">
           <div className="showroom-photo">
-            <img src={showroomImages[showroomImageIndex % showroomImages.length]} alt="Kashmir Cloth Stores showroom" loading="lazy" />
+            <img src={showroomImages[showroomImageIndex % showroomImages.length]} alt="RacoonBro store" loading="lazy" />
             {showroomImages.length > 1 && (
               <div className="showroom-photo-controls" aria-label="Showroom photos">
                 <button type="button" aria-label="Previous showroom photo" onClick={() => setShowroomImageIndex((index) => (index - 1 + showroomImages.length) % showroomImages.length)}>
