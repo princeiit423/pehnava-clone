@@ -40,7 +40,7 @@ app.use((req, res, next) => {
 });
 const allowedOrigins = new Set([
   "http://localhost:5173",
-  "https://kashmirclothstores.vercel.app",
+  "https://racoonbro.vercel.app",
   ...(process.env.CLIENT_ORIGIN || "").split(",").map((origin) => origin.trim()).filter(Boolean),
 ]);
 app.use(cors({
