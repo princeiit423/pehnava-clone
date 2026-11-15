@@ -567,3 +567,287 @@ html[data-theme="dark"] #root .account-dashboard .order-help a:focus-visible {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+html[data-theme="dark"] .product-impression-badge {
+  border: 1px solid rgba(232, 238, 235, 0.18);
+  background-color: rgba(26, 34, 36, 0.94);
+  color: #f0f5f2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+html[data-theme="dark"] .product-impression-badge :is(span, svg) {
+  color: inherit;
+}
+
+html[data-theme="dark"] #root .admin-dashboard {
+  --admin-ink: var(--theme-text);
+  --admin-muted: #b6c2bc;
+  --admin-line: var(--border);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] #root .admin-dashboard :is(
+  .admin-form,
+  .admin-section,
+  .admin-products-list,
+  .admin-inventory-overview,
+  .inventory-dashboard-section,
+  .inventory-summary-card,
+  .sales-history-panel,
+  .sales-summary-card,
+  .admin-overview-welcome,
+  .admin-overview-panel,
+  .admin-overview-metric,
+  .admin-orders-date-metric,
+  .admin-return-card,
+  .homepage-admin-section,
+  .homepage-admin-card,
+  .store-settings-list,
+  .admin-return-request,
+  .product-inventory-field,
+  .admin-cod-fee-note,
+  .admin-category-chips span,
+  .product-stock-preview,
+  .admin-form-actions,
+  .homepage-admin-save,
+  .store-settings-save
+) {
+  border-color: var(--border);
+  background-color: var(--theme-surface);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] #root .admin-dashboard :is(
+  .admin-form-heading p,
+  .admin-form-section-heading span,
+  .admin-brand-eyebrow,
+  .admin-product-meta,
+  .admin-table small,
+  .admin-table th,
+  .admin-table td,
+  .admin-grid label,
+  .admin-grid label > small,
+  .homepage-admin-section-head p,
+  .homepage-admin-card label,
+  .store-settings-field,
+  .store-settings-checkbox,
+  .store-settings-row-head strong,
+  .admin-return-review-actions label,
+  .admin-return-request p,
+  .admin-orders-date-metric span,
+  .admin-orders-date-metric small,
+  .admin-pagination
+) {
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] #root .admin-dashboard :is(
+  .admin-form-section-heading,
+  .admin-table th,
+  .admin-table td,
+  .admin-return-request,
+  .admin-category-chips span,
+  .product-inventory-field,
+  .admin-cod-fee-note
+) {
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] #root .admin-dashboard :is(
+  input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+  select,
+  textarea
+) {
+  border-color: var(--border);
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] #root .admin-dashboard :is(input, textarea)::placeholder {
+  color: #a4b0ab;
+  opacity: 1;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-table th {
+  background-color: var(--theme-surface-raised);
+}
+
+html[data-theme="dark"] #root .admin-dashboard :is(
+  .admin-orders-date-metric.is-selected,
+  .admin-category-chips span,
+  .admin-return-request,
+  .product-inventory-field,
+  .admin-cod-fee-note,
+  .admin-form-actions,
+  .homepage-admin-save,
+  .store-settings-save
+) {
+  background-color: var(--theme-surface-raised);
+}
+
+html[data-theme="dark"] #root .admin-dashboard :is(
+  .order-click-row:hover,
+  .admin-table button:not(.contact-button):not(.admin-cod-toggle),
+  .admin-pagination button,
+  .store-settings-row-head button,
+  .admin-overview-panel-head > button,
+  .admin-overview-quick-actions button + button
+) {
+  border-color: var(--border);
+  background-color: var(--theme-surface-raised);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] #root .admin-dashboard .order-detail-row td,
+html[data-theme="dark"] #root .admin-dashboard .order-detail-panel,
+html[data-theme="dark"] #root .admin-dashboard .order-detail-meta {
+  border-color: var(--border);
+  background-color: var(--theme-surface-raised);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] #root .admin-dashboard button {
+  border-color: var(--border);
+  background-color: var(--theme-surface-raised);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] #root .admin-dashboard button[type="submit"],
+html[data-theme="dark"] #root .admin-dashboard .homepage-admin-save button,
+html[data-theme="dark"] #root .admin-dashboard .store-settings-save button {
+  border-color: #b7f35c;
+  background-color: #b7f35c;
+  color: #172016;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-head-actions > button.admin-section-tab.is-active {
+  border-color: #b7f35c;
+  background-color: #b7f35c;
+  color: #172016;
+}
+
+html[data-theme="dark"] #root .admin-dashboard :is(
+  button.danger-button,
+  .admin-return-reject
+) {
+  border-color: #a95249;
+  background-color: #482b2a;
+  color: #ffd2cc;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-table .contact-button.whatsapp-button {
+  border-color: #168c4b;
+  background-color: #168c4b;
+  color: #fff;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-table .contact-button.email-button {
+  border-color: #245bb5;
+  background-color: #245bb5;
+  color: #fff;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-cod-toggle.is-enabled {
+  border-color: #527a50;
+  background-color: #203b2c;
+  color: #c9f5cf;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-cod-toggle.is-disabled {
+  border-color: #8a4c46;
+  background-color: #482b2a;
+  color: #ffd9d4;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .add-variant-button {
+  border-color: var(--border) !important;
+  background-color: var(--theme-surface-raised) !important;
+  color: var(--theme-text) !important;
+}
+
+html[data-theme="dark"] .product-preview-actions button {
+  border-color: var(--border);
+  background-color: var(--theme-surface-raised);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] .product-preview-actions button:last-child {
+  border-color: #b7f35c;
+  background-color: #b7f35c;
+  color: #172016;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-overview-welcome {
+  border-color: var(--border);
+  background: linear-gradient(120deg, #1a2224, #222c2e);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-overview-welcome h1 {
+  color: #f0f5f2;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-overview-welcome p:last-child {
+  color: #b6c2bc;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .admin-return-count,
+html[data-theme="dark"] #root .admin-dashboard .admin-return-count-large {
+  border: 1px solid #527a50;
+  background: #203b2c;
+  color: #d4efcf;
+}
+
+html[data-theme="dark"] #root .admin-dashboard .homepage-admin-actions :is(a, button) {
+  border: 1px solid var(--border);
+  background: var(--theme-surface-raised);
+  color: var(--theme-text);
+}
+
+html[data-theme="dark"] #root .admin-dashboard .homepage-admin-actions :is(a, button):hover {
+  border-color: #82976e;
+  background: #35443a;
+  color: #eff8e8;
+}
+
+html[data-theme="light"] #root .admin-dashboard .admin-table .contact-button {
+  min-height: 38px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 650;
+  opacity: 1;
+}
+
+html[data-theme="light"] #root .admin-dashboard .admin-table .contact-button.whatsapp-button {
+  border-color: #12683e;
+  background: #187647;
+}
+
+html[data-theme="light"] #root .admin-dashboard .admin-table .contact-button.email-button {
+  border-color: #1d4988;
+  background: #2458a6;
+}
+
+html[data-theme="light"] #root .admin-dashboard .admin-table .contact-button.whatsapp-button:hover:not(:disabled) {
+  border-color: #0e5934;
+  background: #12683e;
+}
+
+html[data-theme="light"] #root .admin-dashboard .admin-table .contact-button.email-button:hover:not(:disabled) {
+  border-color: #173c73;
+  background: #1d4988;
+}
+
+html[data-theme="light"] #root .admin-dashboard .admin-table .contact-button:focus-visible {
+  outline: 3px solid #7f9d6a;
+  outline-offset: 2px;
+}
+
+html[data-theme="light"] #root .admin-dashboard .admin-table .contact-button:disabled {
+  border-color: #d4ddd7;
+  background: #e9eeeb;
+  color: #53625a;
+  opacity: 1;
+}
