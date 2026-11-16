@@ -53,6 +53,7 @@ function publicReview(review) {
     _id: review._id,
     product: String(review.product),
     order: String(review.order),
+    verifiedPurchase: Boolean(review.order),
     authorName: review.authorName,
     rating: review.rating,
     text: review.text,

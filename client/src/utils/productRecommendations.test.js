@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getRelatedProduct } from "./productRecommendations.js";
+import { getRecommendedProducts, getRelatedProduct } from "./productRecommendations.js";
 
 const currentProduct = {
   _id: "current",
@@ -34,5 +34,25 @@ describe("getRelatedProduct", () => {
     const sameProduct = { ...currentProduct, stock: 5 };
 
     expect(getRelatedProduct([sameProduct], currentProduct)).toBeNull();
+  });
+});
+
+describe("getRecommendedProducts", () => {
+  it("ranks in-stock products related to any cart product and excludes cart products", () => {
+    const secondCartProduct = { _id: "cart-2", categories: ["daily-wear"], type: "Shirt" };
+    const related = { _id: "related", categories: ["daily-wear"], type: "Shirt", stock: 2 };
+    const unrelated = { _id: "unrelated", categories: ["other"], stock: 3 };
+    const unavailable = { _id: "sold-out", categories: ["daily-wear"], soldOut: true, stock: 0 };
+
+    expect(getRecommendedProducts([
+      unrelated,
+      unavailable,
+      related,
+      { ...currentProduct, stock: 5 },
+    ], [currentProduct, secondCartProduct], 2)).toEqual([related, unrelated]);
+  });
+
+  it("returns no recommendations without cart products", () => {
+    expect(getRecommendedProducts([{ _id: "product", stock: 1 }], [])).toEqual([]);
   });
 });

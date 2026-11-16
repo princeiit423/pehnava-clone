@@ -15,10 +15,20 @@ import { getProductGalleryImages } from "../utils/productImages.js";
 import { useProductImpression } from "../hooks/useProductImpression.js";
 import ProductImpressionBadge from "../components/ProductImpressionBadge.jsx";
 import ProductLiveViewerCount from "../components/ProductLiveViewerCount.jsx";
-import { Heart, Share2, Minus, Plus, ChevronRight } from "lucide-react";
+import { Heart, Share2, Minus, Plus, ChevronRight, BadgeCheck } from "lucide-react";
 import { ProductPurchaseDetails } from "../components/TrustHighlights.jsx";
 import "./ProductRecommendations.css";
 import "./ProductDetailSpecs.css";
+
+function getReviewerInitials(name) {
+  return String(name || "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0] || "")
+    .join("")
+    .toUpperCase() || "?";
+}
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -378,13 +388,26 @@ export default function ProductDetail() {
             {productReviews.map((review) => (
               <article className="product-review-card" key={review._id}>
                 <div className="product-review-meta">
-                  <strong>{review.authorName}</strong>
+                  <div className="product-review-reviewer">
+                    <span className="product-review-avatar" aria-hidden="true">{getReviewerInitials(review.authorName)}</span>
+                    <div className="product-review-reviewer-copy">
+                      <div className="product-review-author-line">
+                        {review.verifiedPurchase && (
+                          <span className="product-review-verified">
+                            <BadgeCheck size={15} aria-hidden="true" />
+                            Verified purchase
+                          </span>
+                        )}
+                        <strong>{review.authorName}</strong>
+                      </div>
+                      <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString("en-IN")}</time>
+                    </div>
+                  </div>
                   <span className="product-review-stars" aria-label={`${review.rating} out of 5 stars`}>
                     {"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}
                   </span>
-                  <time dateTime={review.createdAt}>{new Date(review.createdAt).toLocaleDateString("en-IN")}</time>
                 </div>
-                <p>{review.text}</p>
+                <p className="product-review-text">{review.text}</p>
                 {review.images?.length > 0 && (
                   <div className="review-image-list">
                     {review.images.map((image) => (

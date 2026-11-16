@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, setAdminToken } from "../api.js";
 import { OUR_CATEGORY_STRIP } from "../categories.js";
+import { parseHomepageImageList } from "../utils/homepageImageList.js";
 
 const EMPTY_CONTENT = {
   heroDesktopImages: [],
@@ -13,18 +14,14 @@ const EMPTY_CONTENT = {
   reviews: [],
 };
 
-function parseLines(value) {
-  return value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-}
-
 function normalizeContent(content) {
   return {
     ...EMPTY_CONTENT,
     ...content,
-    heroDesktopImages: content.heroDesktopImages || [],
-    heroMobileImages: content.heroMobileImages || [],
+    heroDesktopImages: parseHomepageImageList(content.heroDesktopImages || []),
+    heroMobileImages: parseHomepageImageList(content.heroMobileImages || []),
     categoryImages: content.categoryImages || [],
-    showroomImages: content.showroomImages || [],
+    showroomImages: parseHomepageImageList(content.showroomImages || []),
     influencerPicks: content.influencerPicks || [],
     instagramPosts: content.instagramPosts || [],
     reviews: content.reviews || [],
@@ -136,18 +133,18 @@ export default function AdminHomepageContent() {
           <div className="homepage-admin-section-head">
             <div>
               <h2>Homepage images</h2>
-              <p>Paste one public HTTPS image URL per line. Keep the desktop and mobile hero slides in matching order.</p>
+              <p>Paste public HTTPS image URLs one per line or separated by commas. Keep the desktop and mobile hero slides in matching order.</p>
             </div>
           </div>
           <div className="homepage-admin-grid">
             <article className="homepage-admin-card">
               <label>
                 Desktop hero images
-                <textarea rows="5" value={content.heroDesktopImages.join("\n")} placeholder="https://storage.googleapis.com/your-bucket/desktop-banner.jpg" onChange={(event) => setContent((current) => ({ ...current, heroDesktopImages: parseLines(event.target.value) }))} />
+                <textarea rows="5" value={content.heroDesktopImages.join("\n")} placeholder="https://storage.googleapis.com/your-bucket/desktop-banner.jpg" onChange={(event) => setContent((current) => ({ ...current, heroDesktopImages: parseHomepageImageList(event.target.value) }))} />
               </label>
               <label>
                 Mobile hero images
-                <textarea rows="5" value={content.heroMobileImages.join("\n")} placeholder="https://storage.googleapis.com/your-bucket/mobile-banner.jpg" onChange={(event) => setContent((current) => ({ ...current, heroMobileImages: parseLines(event.target.value) }))} />
+                <textarea rows="5" value={content.heroMobileImages.join("\n")} placeholder="https://storage.googleapis.com/your-bucket/mobile-banner.jpg" onChange={(event) => setContent((current) => ({ ...current, heroMobileImages: parseHomepageImageList(event.target.value) }))} />
               </label>
             </article>
             <article className="homepage-admin-card">
@@ -173,7 +170,7 @@ export default function AdminHomepageContent() {
             <article className="homepage-admin-card">
               <label>
                 Showroom image URLs
-                <textarea rows="5" value={content.showroomImages.join("\n")} placeholder="https://storage.googleapis.com/your-bucket/showroom-photo.jpg" onChange={(event) => setContent((current) => ({ ...current, showroomImages: parseLines(event.target.value) }))} />
+                <textarea rows="5" value={content.showroomImages.join("\n")} placeholder="https://storage.googleapis.com/your-bucket/showroom-photo.jpg" onChange={(event) => setContent((current) => ({ ...current, showroomImages: parseHomepageImageList(event.target.value) }))} />
               </label>
               <small>Multiple images appear in a photo carousel. Leave blank to use the default store photo.</small>
             </article>

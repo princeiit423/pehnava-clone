@@ -1,7 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, setCustomerToken } from "../api.js";
-import { ArrowRight, Ban, Eye, EyeOff, Mail, PackageCheck, RotateCcw } from "lucide-react";
+import {
+  ArrowRight,
+  Ban,
+  Eye,
+  EyeOff,
+  LockKeyhole,
+  Mail,
+  PackageCheck,
+  Phone,
+  RotateCcw,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 import { hasCheckoutItems } from "../utils/checkout.js";
 
 const ORDER_PHASES = [
@@ -241,49 +254,165 @@ export default function Account() {
   if (!customer) {
     return (
       <main className="account-page account-auth">
-        <form className="account-form" onSubmit={submit}>
-          <h1>{mode === "login" ? "Your account" : "Create account"}</h1>
-          {mode === "register" && <input placeholder="Full name" required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />}
-          {mode === "login" ? (
-            <input autoComplete="username" placeholder="Enter your Mail ID/Phone Number" required value={form.identifier} onChange={(event) => setForm({ ...form, identifier: event.target.value })} />
-          ) : (
-            <>
-              <input
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel-national"
-                placeholder="10-digit phone number"
-                pattern="[6-9][0-9]{9}"
-                maxLength="10"
-                title="Enter a valid 10-digit Indian mobile number."
-                required
-                value={form.phone}
-                onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, "").slice(0, 10) })}
-              />
-              <input
-                type="email"
-                autoComplete="email"
-                placeholder="Email address"
-                maxLength="254"
-                required
-                value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value.trim() })}
-              />
-            </>
-          )}
-          <div className="account-password-field">
-            <input autoComplete={mode === "login" ? "current-password" : "new-password"} type={showPassword ? "text" : "password"} minLength="8" placeholder="Password (8+ characters)" required value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
-            <button type="button" className="password-visibility-toggle" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((visible) => !visible)}>
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
+        <section className="auth-brand-panel" aria-label="RacoonBro brand">
+          <Link className="auth-brand-logo" to="/" aria-label="RacoonBro home">
+            <img src="/Logos/RacoonBro_primary_logo.png" alt="RacoonBro — Wear the Attitude" />
+          </Link>
+          <div className="auth-brand-copy">
+            <span className="auth-brand-kicker"><Sparkles size={14} aria-hidden="true" /> MADE FOR YOUR EVERYDAY</span>
+            <h2>Style that<br /><em>speaks for you.</em></h2>
+            <p>Find your next favourite, then make it completely your own.</p>
           </div>
-          {mode === "register" && <label><input type="checkbox" checked={form.marketingConsent} onChange={(event) => setForm({ ...form, marketingConsent: event.target.checked })} /> Send me product updates and offers</label>}
-          {error && <p className="error" role="alert">{error}</p>}
-          <button type="submit">{mode === "login" ? "Sign in" : "Create account"}</button>
-          <button type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
-            {mode === "login" ? "Create a new account" : "Already have an account? Sign in"}
-          </button>
-        </form>
+          <div className="auth-brand-benefits">
+            <div>
+              <span className="auth-benefit-icon"><PackageCheck size={17} aria-hidden="true" /></span>
+              <span><strong>Your orders, together</strong><small>Check every order in one place.</small></span>
+            </div>
+            <div>
+              <span className="auth-benefit-icon"><ShieldCheck size={17} aria-hidden="true" /></span>
+              <span><strong>A little more personal</strong><small>Review the pieces you love.</small></span>
+            </div>
+          </div>
+          <div className="auth-brand-signoff">
+            <span className="auth-brand-mascot"><img src="/Logos/RacoonBro_raccoon_icon.png" alt="" /></span>
+            <span><strong>YOUR STYLE. YOUR RULES.</strong><small>WEAR THE ATTITUDE</small></span>
+          </div>
+        </section>
+
+        <section className="auth-form-panel">
+          <header className="auth-form-heading">
+            <span className="auth-form-kicker">{mode === "login" ? "MEMBER ACCESS" : "JOIN THE CREW"}</span>
+            <h1 id="account-auth-title">{mode === "login" ? "Welcome back" : "Create your account"}</h1>
+            <p>{mode === "login"
+              ? "Sign in to pick up right where you left off."
+              : "A few details and you’re ready to make it yours."}</p>
+          </header>
+
+          <form className="account-form" onSubmit={submit} aria-labelledby="account-auth-title">
+            {mode === "register" && (
+              <>
+                <div className="auth-field">
+                  <label htmlFor="account-name">Full name</label>
+                  <div className="auth-input-shell">
+                    <UserRound className="auth-field-icon" size={17} aria-hidden="true" />
+                    <input
+                      id="account-name"
+                      name="name"
+                      autoComplete="name"
+                      placeholder="Your name"
+                      required
+                      value={form.name}
+                      onChange={(event) => setForm({ ...form, name: event.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="auth-field">
+                  <label htmlFor="account-phone">Phone number</label>
+                  <div className="auth-input-shell">
+                    <Phone className="auth-field-icon" size={17} aria-hidden="true" />
+                    <input
+                      id="account-phone"
+                      name="phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      placeholder="10-digit mobile number"
+                      pattern="[6-9][0-9]{9}"
+                      maxLength="10"
+                      title="Enter a valid 10-digit Indian mobile number."
+                      required
+                      value={form.phone}
+                      onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, "").slice(0, 10) })}
+                    />
+                  </div>
+                </div>
+                <div className="auth-field">
+                  <label htmlFor="account-email">Email address</label>
+                  <div className="auth-input-shell">
+                    <Mail className="auth-field-icon" size={17} aria-hidden="true" />
+                    <input
+                      id="account-email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@example.com"
+                      maxLength="254"
+                      required
+                      value={form.email}
+                      onChange={(event) => setForm({ ...form, email: event.target.value.trim() })}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {mode === "login" && (
+              <div className="auth-field">
+                <label htmlFor="account-identifier">Email or phone number</label>
+                <div className="auth-input-shell">
+                  <Mail className="auth-field-icon" size={17} aria-hidden="true" />
+                  <input
+                    id="account-identifier"
+                    name="username"
+                    autoComplete="username"
+                    placeholder="Enter your email or phone"
+                    required
+                    value={form.identifier}
+                    onChange={(event) => setForm({ ...form, identifier: event.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="auth-field">
+              <label htmlFor="account-password">Password</label>
+              <div className="auth-input-shell auth-password-shell">
+                <LockKeyhole className="auth-field-icon" size={17} aria-hidden="true" />
+                <div className="account-password-field">
+                  <input
+                    id="account-password"
+                    name="password"
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
+                    type={showPassword ? "text" : "password"}
+                    minLength="8"
+                    placeholder="At least 8 characters"
+                    required
+                    value={form.password}
+                    onChange={(event) => setForm({ ...form, password: event.target.value })}
+                  />
+                  <button type="button" className="password-visibility-toggle" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((visible) => !visible)}>
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {mode === "register" && (
+              <label className="auth-consent" htmlFor="account-marketing-consent">
+                <input
+                  id="account-marketing-consent"
+                  type="checkbox"
+                  checked={form.marketingConsent}
+                  onChange={(event) => setForm({ ...form, marketingConsent: event.target.checked })}
+                />
+                <span>Send me product updates and offers</span>
+              </label>
+            )}
+
+            {error && <p className="error" role="alert">{error}</p>}
+            <button className="auth-submit" type="submit">
+              <span>{mode === "login" ? "Sign in to your account" : "Create my account"}</span>
+              <ArrowRight size={17} aria-hidden="true" />
+            </button>
+            <div className="auth-mode-switch">
+              <span>{mode === "login" ? "New to RacoonBro?" : "Already part of the crew?"}</span>
+              <button type="button" onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
+                {mode === "login" ? "Create an account" : "Sign in"}
+              </button>
+            </div>
+          </form>
+          <Link className="auth-back-link" to="/">Continue shopping <ArrowRight size={14} aria-hidden="true" /></Link>
+        </section>
       </main>
     );
   }

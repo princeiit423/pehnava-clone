@@ -8,6 +8,7 @@ import { LoadingState, ProductSkeletons } from "../components/LoadingState.jsx";
 import { Link } from "react-router-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DEFAULT_HOME_CAROUSELS, getHomeCarouselProducts, getOrderedHomeCarousels } from "../utils/homeCarousels.js";
+import { parseHomepageImageList } from "../utils/homepageImageList.js";
 import { useProductPages } from "../hooks/useProductPages.js";
 
 function optimizeHeroImage(url, width) {
@@ -59,42 +60,29 @@ export default function Home() {
   // =========================
   // HERO IMAGES
   // =========================
-  const heroImages = [
-    "/racoonbro-banner-desktop.svg",
-    "/racoonbro-banner-alt.svg",
-  ];
-
-  const mobileHeroImages = [
-    "/racoonbro-banner-mobile.svg",
-    "/racoonbro-banner-mobile-alt.svg",
-  ];
-  const desktopSlides = homepageContent.heroDesktopImages.length
-    ? homepageContent.heroDesktopImages
-    : heroImages;
-  const mobileSlides = desktopSlides.map((_, index) =>
-    homepageContent.heroMobileImages[index]
-      || (homepageContent.heroDesktopImages.length ? desktopSlides[index] : mobileHeroImages[index] || desktopSlides[index])
-  );
+  const configuredDesktopSlides = parseHomepageImageList(homepageContent.heroDesktopImages);
+  const configuredMobileSlides = parseHomepageImageList(homepageContent.heroMobileImages);
+  const desktopSlides = configuredDesktopSlides;
+  const mobileSlides = desktopSlides.map((image, index) => configuredMobileSlides[index] || image);
 
   // =========================
   // HERO IMAGE SLIDER
   // =========================
   useEffect(() => {
-    setCurrentHero((index) => index % desktopSlides.length);
+    setCurrentHero((index) => desktopSlides.length ? index % desktopSlides.length : 0);
   }, [desktopSlides.length]);
 
   useEffect(() => {
-    if (!loadedHeroImages[0]) return undefined;
+    if (desktopSlides.length < 2) return undefined;
 
     const interval = setInterval(() => {
       setCurrentHero((prev) => {
-        const next = (prev + 1) % desktopSlides.length;
-        return loadedHeroImages[next] ? next : prev;
+        return (prev + 1) % desktopSlides.length;
       });
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [desktopSlides.length, loadedHeroImages]);
+  }, [desktopSlides.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,39 +133,41 @@ export default function Home() {
       {/* =========================
           HERO
       ========================= */}
-      <section className="hero">
-        <Link
-          to="/collections/trending"
-          className="hero-link"
-          aria-label="Shop RacoonBro everyday essentials"
-        >
-          {desktopSlides.map((image, index) => (
-            <picture
-              className={`hero-slide${index === currentHero ? " is-active" : ""}${loadedHeroImages[index] ? " is-image-ready" : ""}`}
-              key={image}
-              aria-hidden={index !== currentHero}
-            >
-              <source
-                media="(max-width: 600px)"
-                srcSet={optimizeHeroImage(mobileSlides[index] || image, 900)}
-              />
-              <img
-                className="hero-img"
-                src={optimizeHeroImage(image, 1920)}
-                alt={index === currentHero ? "RacoonBro everyday clothing" : ""}
-                loading={index === 0 ? "eager" : "lazy"}
-                fetchPriority={index === currentHero ? "high" : "low"}
-                decoding="async"
-                onLoad={() => setLoadedHeroImages((loaded) => {
-                  const next = [...loaded];
-                  next[index] = true;
-                  return next;
-                })}
-              />
-            </picture>
-          ))}
-        </Link>
-      </section>
+      {desktopSlides.length > 0 && (
+        <section className="hero">
+          <Link
+            to="/collections/trending"
+            className="hero-link"
+            aria-label="Shop RacoonBro everyday essentials"
+          >
+            {desktopSlides.map((image, index) => (
+              <picture
+                className={`hero-slide${index === currentHero ? " is-active" : ""}${loadedHeroImages[index] ? " is-image-ready" : ""}`}
+                key={`${image}-${index}`}
+                aria-hidden={index !== currentHero}
+              >
+                <source
+                  media="(max-width: 600px)"
+                  srcSet={optimizeHeroImage(mobileSlides[index] || image, 900)}
+                />
+                <img
+                  className="hero-img"
+                  src={optimizeHeroImage(image, 1920)}
+                  alt={index === currentHero ? "RacoonBro everyday clothing" : ""}
+                  loading={index === currentHero || index === (currentHero + 1) % desktopSlides.length ? "eager" : "lazy"}
+                  fetchPriority={index === currentHero ? "high" : "low"}
+                  decoding="async"
+                  onLoad={() => setLoadedHeroImages((loaded) => {
+                    const next = [...loaded];
+                    next[index] = true;
+                    return next;
+                  })}
+                />
+              </picture>
+            ))}
+          </Link>
+        </section>
+      )}
       {productLoadError && <p className="loading-error home-load-error" role="alert">
         Products could not be loaded. <button type="button" onClick={retryFirstPage}>Retry</button>
       </p>}

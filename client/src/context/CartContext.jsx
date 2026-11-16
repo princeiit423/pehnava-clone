@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { changeCartItemSize } from "../utils/cartItems.js";
 
 const CartContext = createContext(null);
 const KEY = "kashmir_cloth_stores_cart";
@@ -72,6 +73,10 @@ export function CartProvider({ children }) {
     setCart((current) => current.map((item) => item.key === key ? { ...item, quantity } : item));
   }
 
+  function changeSize(key, size) {
+    setCart(changeCartItemSize(cart, key, size));
+  }
+
   function removeFromCart(key) {
     setCart((current) => current.filter((item) => item.key !== key));
   }
@@ -98,7 +103,7 @@ export function CartProvider({ children }) {
   const itemCount = useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
 
   return (
-    <CartContext.Provider value={{ cart, itemCount, addToCart, updateQuantity, removeFromCart, removeItems, clearCart }}>
+    <CartContext.Provider value={{ cart, itemCount, addToCart, updateQuantity, changeSize, removeFromCart, removeItems, clearCart }}>
       {children}
     </CartContext.Provider>
   );
